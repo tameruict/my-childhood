@@ -3,9 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "description": "Anime Crossover BVN — HTML5 Fighting Game with M.U.G.E.N Sprites & WebSocket Netplay",
-  "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node ws-server.js",
     "verify": "node verify-bvn.js",
     "upload-r2": "node upload-r2.mjs"
   },

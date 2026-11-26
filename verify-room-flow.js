@@ -324,7 +324,7 @@ async function testHttpAndWsProtocol() {
   await sleep(150);
 
   // 8. Production mode check: lanUrls === []
-  const prodSrv = spawn(process.execPath, [path.join(ROOT, 'server.js')], {
+  const prodSrv = spawn(process.execPath, [path.join(ROOT, 'ws-server.js')], {
     env: { ...process.env, PORT: String(PROD_PORT), NODE_ENV: 'production' },
     stdio: 'pipe'
   });
@@ -690,7 +690,7 @@ async function testTwoBrowserRoomE2E() {
 }
 
 (async () => {
-  const srv = spawn(process.execPath, [path.join(ROOT, 'server.js')], {
+  const srv = spawn(process.execPath, [path.join(ROOT, 'ws-server.js')], {
     env: { ...process.env, PORT: String(PORT) },
     stdio: 'pipe'
   });

@@ -338,7 +338,7 @@ async function runBotDifficultyE2E() {
 }
 
 (async () => {
-  const srv = spawn(process.execPath, [path.join(ROOT, 'server.js')], {
+  const srv = spawn(process.execPath, [path.join(ROOT, 'ws-server.js')], {
     env: { ...process.env, PORT: String(PORT) },
     stdio: 'pipe'
   });

@@ -917,7 +917,7 @@ async function testHeadlessChromeUI(manifestCount) {
   }
   console.log(`[PASS] Verified ${keys.length}/${keys.length} avatar pairs (${keys.length * 2} valid PNGs) on disk.`);
 
-  const srv = spawn(process.execPath, [path.join(ROOT, 'server.js')], {
+  const srv = spawn(process.execPath, [path.join(ROOT, 'ws-server.js')], {
     env: { ...process.env, PORT: String(PORT) },
     stdio: 'pipe'
   });
