@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BVN: ANIME MULTIVERSE — Đấu Trường Đối Kháng Crossover &amp; Online PvP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,800;1,900&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ==================== GLOBAL ARCADE TOPBAR (AUTO-HIDDEN IN BATTLE) ==================== -->
+  <header class="bvn-topbar">
+    <div class="topbar-left">
+      <button id="btnTopHome" class="brand-btn" type="button" title="Về Màn Hình Chính">
+        <span class="brand-crest">BVN</span>
+        <span class="brand-name">ANIME MULTIVERSE</span>
+      </button>
+
+      <div id="netStatusPill" class="net-pill offline" title="Trạng thái kết nối Online PvP">
+        <span class="net-dot" aria-hidden="true"></span>
+        <span id="netStatusText">Đang kết nối...</span>
+      </div>
+
+      <div id="activeRoomPill" class="room-pill hidden" role="button" tabindex="0" title="Nhấn để sao chép mã phòng">
+        <span class="room-pill-lbl">PHÒNG</span>
+        <strong id="topRoomCode">------</strong>
+        <span id="topRoomSlot" class="slot-badge">P1</span>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <button id="btnOpenProfile" class="top-chip profile-chip" type="button" title="Đổi tên người chơi &amp; Xem Elo">
+        <span class="chip-avatar">P1</span>
+        <span class="chip-text">
+          <strong id="p1ProfileName">Hero_1024 #1024</strong>
+          <small id="p1ProfileStats">Elo 1200 · 0W/0L</small>
+        </span>
+      </button>
+
+      <button id="btnTopControls" class="top-icon-btn" type="button" title="Bảng Phím Chuẩn BVN">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="2" y="6" width="20" height="12" rx="2" />
+          <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" />
+        </svg>
+        <span>Phím</span>
+      </button>
+
+      <button id="btnTopMugen" class="top-icon-btn subtle" type="button" title="Nạp nhân vật tùy chỉnh (.SFF/.AIR)">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
+        <span>Custom</span>
+      </button>
+
+      <button id="btnTopSound" class="top-icon-btn sound-btn" type="button" title="Bật / Tắt Âm Thanh">Âm Thanh: BẬT</button>
+    </div>
+  </header>
+
+  <!-- ==================== SCREEN 1: BVN MAIN MENU ==================== -->
+  <section id="screenMenu" class="bvn-screen active">
+    <div class="menu-bg-fx" aria-hidden="true"></div>
+    <div class="menu-bg-slash" aria-hidden="true"></div>
+
+    <div class="menu-layout">
+      <div class="menu-hero">
+        <div class="hero-kicker">
+          <span class="kicker-bar" aria-hidden="true"></span>
+          CROSSOVER ARCADE EDITION
+        </div>
+
+        <h1 class="hero-title">
+          ANIME <span class="title-accent">MULTIVERSE</span>
+          <span class="title-sublock">BVN FIGHTER</span>
+        </h1>
+
+        <p class="hero-sub">
+          Đối kháng 2D chuẩn Bleach vs Naruto quy tụ chiến binh đa vũ trụ Anime — Chiêu thức 1 nút sắc bén, Thức Tỉnh đổi bộ chiêu, Viện Trợ [O], đấu 3v3 / 1v1 cùng bạn bè Online &amp; 2P chung máy.
+        </p>
+
+        <div class="hero-meta-row" aria-label="Thông số trò chơi">
+          <div class="hero-stat">
+            <strong id="menuRosterCount">63</strong>
+            <span>Chiến Binh</span>
+          </div>
+          <div class="hero-stat-sep" aria-hidden="true"></div>
+          <div class="hero-stat">
+            <strong id="menuMapCount">22</strong>
+            <span>Đấu Trường</span>
+          </div>
+          <div class="hero-stat-sep" aria-hidden="true"></div>
+          <div class="hero-stat online-stat">
+            <strong id="menuOnlineCount">1</strong>
+            <span>Đang Online</span>
+          </div>
+        </div>
+
+        <div class="hero-showcase-label">CHIẾN BINH TIÊU BIỂU</div>
+        <div class="hero-showcase-strip" id="menuHeroStrip">
+          <!-- Populated dynamically with fighter avatars -->
+        </div>
+      </div>
+
+      <nav class="bvn-menu-stack" aria-label="Menu Chế Độ Chơi">
+        <button class="bvn-menu-btn primary-glow" type="button" data-menu-action="ONLINE_PVP">
+          <span class="m-tag">ONLINE</span>
+          <span class="m-main">
+            <strong>ONLINE PVP</strong>
+            <small>Tạo phòng Online · Link mời tức thì · Ghép nhanh</small>
+          </span>
+          <span class="m-arrow" aria-hidden="true">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </span>
+        </button>
+
+        <button class="bvn-menu-btn" type="button" data-menu-action="TEAM_CPU">
+          <span class="m-tag">3v3</span>
+          <span class="m-main">
+            <strong>TEAM PLAY 3v3</strong>
+            <small>Chọn 3 tướng + 1 Viện Trợ [O] đối đầu AI</small>
+          </span>
+          <span class="m-arrow" aria-hidden="true">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </span>
+        </button>
+
+        <button class="bvn-menu-btn" type="button" data-menu-action="SINGLE_CPU">
+          <span class="m-tag">1v1 BO3</span>
+          <span class="m-main">
+            <strong>SINGLE PLAY 1v1</strong>
+            <small>Đấu đơn Best-of-3 hiệp + Viện Trợ [O] vs AI</small>
+          </span>
+          <span class="m-arrow" aria-hidden="true">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </span>
+        </button>
+
+        <button class="bvn-menu-btn" type="button" data-menu-action="LOCAL_2P">
+          <span class="m-tag">LOCAL 2P</span>
+          <span class="m-main">
+            <strong>2P VERSUS</strong>
+            <small>Đấu 2 người chung bàn phím (hỗ trợ 1v1 &amp; 3v3)</small>
+          </span>
+          <span class="m-arrow" aria-hidden="true">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </span>
+        </button>
+
+        <button class="bvn-menu-btn" type="button" data-menu-action="TRAINING">
+          <span class="m-tag">DOJO</span>
+          <span class="m-main">
+            <strong>TRAINING</strong>
+            <small>Phòng tập combo · Full 3 thanh Nộ · Tùy chọn Hitbox</small>
+          </span>
+          <span class="m-arrow" aria-hidden="true">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+          </span>
+        </button>
+
+        <div class="menu-hint-bar">
+          <span><kbd>W</kbd> <kbd>S</kbd> Di chuyển</span>
+          <span class="hint-sep" aria-hidden="true">·</span>
+          <span><kbd>J</kbd> / <kbd>Enter</kbd> Xác nhận</span>
+        </div>
+      </nav>
+    </div>
+  </section>
+
+  <!-- ==================== SCREEN 2: ONLINE MULTIPLAYER LOBBY ==================== -->
+  <section id="screenLobby" class="bvn-screen">
+    <div class="screen-header">
+      <div class="sh-left">
+        <button id="btnLobbyBack" class="bvn-btn ghost sm" type="button">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
+          <span>Menu Chính</span>
+        </button>
+        <div class="sh-titles">
+          <h2>PHÒNG ĐẤU ONLINE PVP</h2>
+          <p>Tạo phòng công khai hoặc riêng tư, chia sẻ link mời cho bạn bè hoặc ghép trận nhanh.</p>
+        </div>
+      </div>
+      <div class="sh-right lobby-head-badges">
+        <span id="lobbyServerPingBadge" class="ping-badge hidden">--ms</span>
+        <span id="lobbyOnlineBadge" class="status-pill">Đang kết nối...</span>
+      </div>
+    </div>
+
+    <!-- CONNECTION / RENDER COLD-START WAKE-UP BANNER -->
+    <div id="lobbyConnBanner" class="lobby-conn-banner hidden" role="status" aria-live="polite">
+      <div class="conn-banner-left">
+        <span class="conn-spinner" aria-hidden="true"></span>
+        <div class="conn-banner-copy">
+          <strong id="lobbyConnTitle">Đang kết nối máy chủ Online...</strong>
+          <small id="lobbyConnSub">Vui lòng chờ giây lát.</small>
+        </div>
+      </div>
+      <div class="conn-banner-right">
+        <span id="lobbyConnElapsed" class="conn-elapsed hidden">0s</span>
+        <button id="btnLobbyReconnect" class="bvn-btn ghost xs" type="button">Thử Kết Nối Lại</button>
+      </div>
+    </div>
+
+    <!-- SHARED LOBBY FEEDBACK BANNERS -->
+    <div id="lobbyErrorMsg" class="lobby-error hidden" role="alert"></div>
+    <div id="lobbyNoticeMsg" class="lobby-notice hidden" role="status" aria-live="polite"></div>
+
+    <!-- VIEW A: LOBBY HUB (CREATE / QUICK MATCH / JOIN BY CODE + PUBLIC ROOMS) -->
+    <div id="lobbyHubView" class="lobby-grid">
+      <!-- LEFT PLATE: CREATE / QUICK MATCH / JOIN BY CODE -->
+      <div class="lobby-card">
+        <div class="lobby-card-head">
+          <h3>TẠO &amp; VÀO PHÒNG</h3>
+          <span class="plate-tag">P1 HOST / P2 GUEST</span>
+        </div>
+
+        <div id="lobbyCreateForm" class="lobby-create-form">
+          <div class="lobby-form-row">
+            <div class="lobby-field">
+              <label class="fp-label" for="inputLobbyRoomName">Tên phòng</label>
+              <input id="inputLobbyRoomName" class="bvn-input sm" type="text" maxlength="32" placeholder="VD: Giao lưu 3v3 tối nay..." autocomplete="off" />
+            </div>
+            <div class="lobby-field">
+              <label class="fp-label" for="inputLobbyRoomPassword">Mật khẩu (tùy chọn)</label>
+              <div class="pwd-input-wrap">
+                <input id="inputLobbyRoomPassword" class="bvn-input sm" type="password" maxlength="24" placeholder="Không bắt buộc" autocomplete="new-password" />
+                <button id="btnToggleCreatePwd" class="pwd-eye-btn" type="button" title="Hiện / Ẩn mật khẩu" aria-label="Hiện hoặc ẩn mật khẩu">Hiện</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="lobby-form-row">
+            <div class="lobby-field">
+              <span class="fp-label">Thể thức</span>
+              <div class="fmt-seg">
+                <button class="fmt-btn active" type="button" data-lobby-format="1v1">1v1 BO3</button>
+                <button class="fmt-btn" type="button" data-lobby-format="3v3">3v3 BVN</button>
+              </div>
+            </div>
+            <div class="lobby-field">
+              <span class="fp-label">Hiển thị phòng</span>
+              <div class="fmt-seg vis-seg">
+                <button class="fmt-btn active" type="button" data-lobby-visibility="public">Công Khai</button>
+                <button class="fmt-btn" type="button" data-lobby-visibility="private">Riêng Tư</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="lobby-action-group">
+            <button id="btnCreateRoom" class="bvn-btn primary lg" type="button">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5" />
+                <line x1="13" y1="19" x2="19" y2="13" />
+                <line x1="16" y1="16" x2="20" y2="20" />
+                <line x1="19" y1="21" x2="21" y2="19" />
+              </svg>
+              <span>TẠO PHÒNG MỚI</span>
+            </button>
+
+            <button id="btnQuickMatch" class="bvn-btn secondary lg" type="button">
+              <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+              </svg>
+              <span>GHÉP NGẪU NHIÊN</span>
+            </button>
+          </div>
+
+          <div class="lobby-divider"><span>VÀO PHÒNG BẰNG MÃ</span></div>
+
+          <div class="join-room-row">
+            <input id="inputLobbyRoomCode" class="bvn-input code-input" type="text" maxlength="8" placeholder="Nhập mã phòng (4–8 ký tự)..." aria-label="Mã phòng" autocomplete="off" />
+            <button id="btnJoinRoomByCode" class="bvn-btn ghost nowrap" type="button">Vào Phòng</button>
+          </div>
+        </div>
+
+        <!-- QUICK MATCH QUEUE STATE (SWAPS CLEANLY WITH CREATE FORM) -->
+        <div id="lobbyQueueBox" class="queue-box hidden">
+          <div class="queue-top">
+            <span class="pulse-dot" aria-hidden="true"></span>
+            <strong id="lobbyQueueTitle">ĐANG TÌM ĐỐI THỦ NGẪU NHIÊN...</strong>
+          </div>
+          <p id="lobbyQueueMeta" class="queue-meta">Thể thức 1V1 · Thời gian chờ: 00:00</p>
+          <p class="queue-sub">Hệ thống tự động ghép với người chơi cùng thể thức. Phòng riêng tư hoặc có mật khẩu sẽ không bị ghép vào.</p>
+          <div class="queue-actions">
+            <button id="btnCancelQuickMatch" class="bvn-btn danger sm" type="button">Hủy Ghép Trận</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT PLATE: LIVE PUBLIC ROOMS LIST -->
+      <div class="lobby-card">
+        <div class="lobby-card-head">
+          <div class="card-head-title-wrap">
+            <h3>PHÒNG CÔNG KHAI</h3>
+            <span id="lobbyOpenRoomsCount" class="rooms-count-pill">0</span>
+          </div>
+          <div class="rooms-head-controls">
+            <div class="rooms-filter-seg" role="group" aria-label="Lọc theo thể thức">
+              <button class="rf-btn active" type="button" data-room-filter="all">Tất Cả</button>
+              <button class="rf-btn" type="button" data-room-filter="1v1">1v1</button>
+              <button class="rf-btn" type="button" data-room-filter="3v3">3v3</button>
+            </div>
+            <button id="btnRefreshRooms" class="bvn-btn ghost xs" type="button">
+              <svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+              <span>Làm Mới</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="openRoomsList" class="rooms-list">
+          <div class="rooms-empty">Chưa có phòng công khai nào đang chờ. Bấm <strong>Tạo Phòng Mới</strong> để bắt đầu ngay.</div>
+        </div>
+
+        <div class="lobby-tip-box">
+          <div class="tip-line">
+            <span class="tip-num">1</span>
+            <span>Tạo phòng và chia sẻ <strong>Mã Phòng</strong> hoặc <strong>Link Mời</strong> — bạn bè mở trình duyệt là vào thẳng phòng.</span>
+          </div>
+          <div class="tip-line">
+            <span class="tip-num">2</span>
+            <span>Cả 2 người đều dùng phím chuẩn <kbd>WASD</kbd> + <kbd>J</kbd><kbd>K</kbd><kbd>L</kbd><kbd>U</kbd><kbd>I</kbd><kbd>O</kbd> trên máy của mình.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW B: PRE-MATCH ROOM STAGING LOBBY (HOST & GUEST SLOTS) -->
+    <div id="lobbyRoomView" class="lobby-room-view hidden">
+      <div class="room-stage-card">
+        <div class="room-stage-head">
+          <div class="room-stage-meta">
+            <div class="room-stage-title-row">
+              <h3 id="roomStageName">Phòng Đấu</h3>
+              <span id="roomStageFormatBadge" class="room-badge fmt">1V1</span>
+              <span id="roomStageVisBadge" class="room-badge vis">CÔNG KHAI</span>
+              <span id="roomStageLockBadge" class="room-badge lock hidden">CÓ MẬT KHẨU</span>
+            </div>
+            <p id="roomStageSub" class="room-stage-sub">Đang chờ đối thủ vào phòng...</p>
+          </div>
+
+          <div class="room-share-strip">
+            <div class="room-code-box">
+              <span class="room-code-lbl">MÃ PHÒNG</span>
+              <strong id="roomStageCode" class="big-room-code">------</strong>
+            </div>
+            <div class="room-share-btns">
+              <button id="btnCopyRoomCode" class="bvn-btn ghost sm" type="button">Sao Chép Mã</button>
+              <button id="btnCopyInviteLink" class="bvn-btn secondary sm" type="button">Sao Chép Link Mời</button>
+              <button id="btnLeaveRoomStage" class="bvn-btn danger sm" type="button">Đóng Phòng</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- HOST QUICK SETTINGS STRIP (HOST ONLY) -->
+        <div id="roomHostSettingsBar" class="room-host-settings hidden">
+          <div class="rhs-group">
+            <span class="rhs-lbl">Thể thức:</span>
+            <div class="rhs-seg">
+              <button class="rhs-btn active" type="button" data-room-edit-format="1v1">1v1 BO3</button>
+              <button class="rhs-btn" type="button" data-room-edit-format="3v3">3v3 BVN</button>
+            </div>
+          </div>
+          <div class="rhs-group">
+            <span class="rhs-lbl">Hiển thị:</span>
+            <div class="rhs-seg">
+              <button class="rhs-btn active" type="button" data-room-edit-vis="public">Công Khai</button>
+              <button class="rhs-btn" type="button" data-room-edit-vis="private">Riêng Tư</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2-PLAYER VS SLOTS -->
+        <div class="room-vs-grid">
+          <!-- P1 HOST SLOT -->
+          <div id="roomSlotP1" class="room-player-card p1-card is-ready">
+            <div class="rpc-top">
+              <span class="side-badge p1">P1 · CHỦ PHÒNG</span>
+              <span id="roomP1ReadyBadge" class="ready-pill ready">SẴN SÀNG</span>
+            </div>
+            <div class="rpc-body">
+              <div class="rpc-avatar p1">P1</div>
+              <div class="rpc-info">
+                <strong id="roomP1Name">Chủ Phòng</strong>
+                <small id="roomP1TagElo">#1000 · Elo 1200</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- CENTER VS EMBLEM -->
+          <div class="room-vs-center" aria-hidden="true">
+            <span class="vs-badge">VS</span>
+          </div>
+
+          <!-- P2 GUEST SLOT -->
+          <div id="roomSlotP2" class="room-player-card p2-card">
+            <div id="roomP2Filled" class="rpc-filled hidden">
+              <div class="rpc-top">
+                <span class="side-badge p2">P2 · ĐỐI THỦ</span>
+                <div class="rpc-top-right">
+                  <span id="roomP2ReadyBadge" class="ready-pill waiting">CHƯA SẴN SÀNG</span>
+                  <button id="btnKickGuest" class="bvn-btn danger xs hidden" type="button" title="Mời đối thủ ra khỏi phòng">Mời Ra</button>
+                </div>
+              </div>
+              <div class="rpc-body">
+                <div class="rpc-avatar p2">P2</div>
+                <div class="rpc-info">
+                  <strong id="roomP2Name">Đối Thủ</strong>
+                  <small id="roomP2TagElo">#2000 · Elo 1200</small>
+                </div>
+              </div>
+            </div>
+
+            <div id="roomP2Empty" class="rpc-empty">
+              <div class="rpc-empty-head">
+                <span class="pulse-dot" aria-hidden="true"></span>
+                <strong>ĐANG CHỜ ĐỐI THỦ VÀO PHÒNG</strong>
+              </div>
+              <p class="rpc-empty-desc">Gửi link mời dưới đây cho bạn bè để vào thẳng phòng:</p>
+              <div class="room-invite-preview">
+                <input id="roomInviteUrlInput" class="bvn-input sm invite-url-input" type="text" readonly aria-label="Link mời vào phòng" />
+                <button id="btnCopyInviteInline" class="bvn-btn ghost xs nowrap" type="button">Sao Chép</button>
+              </div>
+              <p id="lobbyLanHint" class="lan-hint hidden"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- FOOTER ACTIONS -->
+        <div class="room-stage-footer">
+          <div id="roomStageStatusHint" class="room-stage-hint">
+            Chia sẻ mã phòng hoặc link mời để đối thủ tham gia.
+          </div>
+          <div class="room-stage-actions">
+            <button id="btnToggleReady" class="bvn-btn secondary lg hidden" type="button">SẴN SÀNG</button>
+            <button id="btnStartRoomMatch" class="bvn-btn primary lg hidden" type="button" disabled>BẮT ĐẦU CHỌN TƯỚNG</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== SCREEN 3: BVN CHARACTER & ASSIST SELECT ==================== -->
+  <section id="screenSelect" class="bvn-screen">
+    <div class="select-topbar">
+      <div class="st-left">
+        <button id="btnSelectBack" class="bvn-btn ghost sm" type="button">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
+          <span>Quay Lại</span>
+        </button>
+        <div id="selectModeBadge" class="mode-pill">TEAM PLAY 3v3 · VS CPU</div>
+        <div id="selectFormatToggle" class="format-mini-toggle">
+          <button class="fmt-mini active" type="button" data-sel-format="1v1">1v1</button>
+          <button class="fmt-mini" type="button" data-sel-format="3v3">3v3</button>
+        </div>
+        <div id="selectAiDifficulty" class="ai-diff-picker hidden" role="group" aria-label="Độ khó CPU">
+          <span class="ai-diff-lbl">CPU:</span>
+          <div class="ai-diff-seg">
+            <button class="ai-diff-btn" type="button" data-ai-diff="easy">Dễ</button>
+            <button class="ai-diff-btn active" type="button" data-ai-diff="normal">Trung Bình</button>
+            <button class="ai-diff-btn" type="button" data-ai-diff="hard">Khó</button>
+            <button class="ai-diff-btn" type="button" data-ai-diff="nightmare">Ác Mộng</button>
+          </div>
+          <span id="selectAiDiffHint" class="ai-diff-hint"></span>
+        </div>
+      </div>
+
+      <div class="select-steps" aria-label="Tiến trình chọn trận">
+        <span id="stepTag1" class="step-tag active">1. CHỌN TƯỚNG</span>
+        <span class="step-sep" aria-hidden="true">/</span>
+        <span id="stepTag2" class="step-tag">2. VIỆN TRỢ [O]</span>
+        <span class="step-sep" aria-hidden="true">/</span>
+        <span id="stepTag3" class="step-tag">3. BẢN ĐỒ</span>
+      </div>
+
+      <div class="st-right">
+        <button id="btnSelectRandomAll" class="bvn-btn secondary sm" type="button">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="16 3 21 3 21 8" />
+            <line x1="4" y1="20" x2="21" y2="3" />
+            <polyline points="21 16 21 21 16 21" />
+            <line x1="15" y1="15" x2="21" y2="21" />
+            <line x1="4" y1="4" x2="9" y2="9" />
+          </svg>
+          <span>Chọn Nhanh</span>
+        </button>
+        <button id="btnSelectUndo" class="bvn-btn ghost sm" type="button">Hoàn Tác [K]</button>
+      </div>
+    </div>
+
+    <div class="select-main">
+      <!-- P1 SHOWCASE PANEL (LEFT) -->
+      <aside class="fighter-showcase p1-side">
+        <div class="showcase-header">
+          <span class="side-badge p1">P1</span>
+          <span id="selP1Owner" class="owner-label">BẠN</span>
+          <span id="selP1Phase" class="phase-pill">ĐANG CHỌN</span>
+        </div>
+
+        <div class="showcase-portrait-stage" id="selP1Stage">
+          <div class="showcase-aura" id="selP1Aura" aria-hidden="true"></div>
+          <img id="selP1BigImg" class="showcase-big-img" src="avatars/naruto_big.png" alt="P1 Portrait" />
+          <div class="showcase-nameplate">
+            <span id="selP1Uni" class="uni-tag">NARUTO</span>
+            <h3 id="selP1Name">Uzumaki Naruto</h3>
+            <p id="selP1Title">Cửu Vĩ Kurama Mode</p>
+          </div>
+        </div>
+
+        <div class="team-slots-wrap">
+          <div class="slots-label">
+            <span>ĐỘI HÌNH P1</span>
+            <span id="selP1Count">(0/1)</span>
+          </div>
+          <div id="selP1Slots" class="team-slots-row"></div>
+        </div>
+
+        <div id="selP1Skills" class="showcase-skills"></div>
+      </aside>
+
+      <!-- CENTER BVN AVATAR PORTRAIT MATRIX -->
+      <div class="roster-center">
+        <div class="roster-filter-bar">
+          <div class="search-wrap">
+            <svg class="ico search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <input id="selSearchInput" class="bvn-input sm search-input" type="text" placeholder="Tìm chiến binh (Naruto, Goku, Luffy, Gojo, DIO...)" aria-label="Tìm chiến binh" />
+          </div>
+          <div id="selTurnHint" class="turn-hint">Click ảnh đại diện hoặc bấm [WASD + J] để chọn!</div>
+        </div>
+
+        <div id="selUniverseBar" class="universe-tabs" role="tablist" aria-label="Lọc theo vũ trụ"></div>
+
+        <div id="selAvatarGrid" class="avatar-grid">
+          <!-- Populated dynamically with fighter portraits + Random tile -->
+        </div>
+
+        <div class="roster-bottom-bar">
+          <div class="pick-target-switch" id="pickTargetSwitch">
+            <span class="pts-label">Chọn cho:</span>
+            <button id="btnTargetP1" class="target-btn p1 active" type="button">P1</button>
+            <button id="btnTargetP2" class="target-btn p2" type="button">P2</button>
+          </div>
+          <div class="select-cta-group">
+            <button id="btnProceedMap" class="bvn-btn primary proceed-btn" type="button" disabled>
+              TIẾP TỤC CHỌN BẢN ĐỒ
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- P2 SHOWCASE PANEL (RIGHT) -->
+      <aside class="fighter-showcase p2-side">
+        <div class="showcase-header">
+          <span class="side-badge p2">P2</span>
+          <span id="selP2Owner" class="owner-label">BVN AI</span>
+          <span id="selP2Phase" class="phase-pill">CHỜ CHỌN</span>
+        </div>
+
+        <div class="showcase-portrait-stage" id="selP2Stage">
+          <div class="showcase-aura" id="selP2Aura" aria-hidden="true"></div>
+          <img id="selP2BigImg" class="showcase-big-img mirror-x" src="avatars/luffy_big.png" alt="P2 Portrait" />
+          <div class="showcase-nameplate">
+            <span id="selP2Uni" class="uni-tag">ONE PIECE</span>
+            <h3 id="selP2Name">Monkey D. Luffy</h3>
+            <p id="selP2Title">Gear 4 &amp; Gear 5 Nika</p>
+          </div>
+        </div>
+
+        <div class="team-slots-wrap">
+          <div class="slots-label">
+            <span>ĐỘI HÌNH P2</span>
+            <span id="selP2Count">(0/1)</span>
+          </div>
+          <div id="selP2Slots" class="team-slots-row"></div>
+        </div>
+
+        <div id="selP2Skills" class="showcase-skills"></div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ==================== SCREEN 4: BVN STAGE / MAP SELECT ==================== -->
+  <section id="screenMapSelect" class="bvn-screen">
+    <div class="select-topbar">
+      <div class="st-left">
+        <button id="btnMapBack" class="bvn-btn ghost sm" type="button">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></svg>
+          <span>Chọn Lại Tướng</span>
+        </button>
+        <div class="mode-pill">BƯỚC 3 · CHỌN ĐẤU TRƯỜNG</div>
+      </div>
+      <div id="mapMatchupStrip" class="map-matchup-strip"></div>
+      <div class="st-right">
+        <button id="btnMapRandomPick" class="bvn-btn secondary sm" type="button">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="16 3 21 3 21 8" />
+            <line x1="4" y1="20" x2="21" y2="3" />
+            <polyline points="21 16 21 21 16 21" />
+            <line x1="15" y1="15" x2="21" y2="21" />
+            <line x1="4" y1="4" x2="9" y2="9" />
+          </svg>
+          <span>Map Ngẫu Nhiên</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="map-select-body">
+      <div class="map-hero-preview">
+        <button id="btnMapPrev" class="carousel-arrow" type="button" title="Map Trước (A / ←)" aria-label="Bản đồ trước">
+          <svg class="ico lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6" /></svg>
+        </button>
+
+        <div class="map-preview-frame">
+          <canvas id="mapPreviewCanvas" width="640" height="280"></canvas>
+          <div class="map-preview-caption">
+            <div class="map-cap-text">
+              <span id="mapPreviewCat" class="map-cat-tag">NARUTO</span>
+              <h2 id="mapPreviewName">Làng Lá (Konohagakure)</h2>
+              <p id="mapPreviewDesc">Làng Lá dưới bầu trời trong xanh, núi khắc mặt 4 vị Hokage uy nghi.</p>
+            </div>
+            <button id="btnStartBattle" class="bvn-btn primary lg battle-go-btn" type="button">
+              BẮT ĐẦU TRẬN ĐẤU
+            </button>
+          </div>
+        </div>
+
+        <button id="btnMapNext" class="carousel-arrow" type="button" title="Map Tiếp (D / →)" aria-label="Bản đồ tiếp theo">
+          <svg class="ico lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6" /></svg>
+        </button>
+      </div>
+
+      <div class="map-thumb-section">
+        <div id="mapSelectCatBar" class="universe-tabs"></div>
+        <div id="mapThumbGrid" class="map-thumb-grid">
+          <!-- Rendered map thumbnails -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== SCREEN 5: BVN VS LOADING SPLASH ==================== -->
+  <section id="screenVsSplash" class="bvn-screen vs-splash-screen">
+    <div class="vs-half p1-half">
+      <img id="vsP1Img" class="vs-big-portrait" src="avatars/naruto_big.png" alt="P1" />
+      <div class="vs-info">
+        <span id="vsP1Badge" class="side-badge p1">PLAYER 1</span>
+        <h2 id="vsP1Name">Uzumaki Naruto</h2>
+        <div id="vsP1TeamRow" class="vs-team-avatars"></div>
+      </div>
+    </div>
+
+    <div class="vs-center-emblem">
+      <div class="vs-burst">VS</div>
+      <div id="vsStageLabel" class="vs-stage-label">Làng Lá (Konohagakure)</div>
+      <div id="vsLoadStatus" class="vs-load-status">Đang chuẩn bị đấu trường...</div>
+    </div>
+
+    <div class="vs-half p2-half">
+      <img id="vsP2Img" class="vs-big-portrait mirror-x" src="avatars/luffy_big.png" alt="P2" />
+      <div class="vs-info">
+        <span id="vsP2Badge" class="side-badge p2">PLAYER 2</span>
+        <h2 id="vsP2Name">Monkey D. Luffy</h2>
+        <div id="vsP2TeamRow" class="vs-team-avatars"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== SCREEN 6: BVN BATTLE ARENA ==================== -->
+  <section id="screenBattle" class="bvn-screen battle-screen">
+    <div class="battle-toolbar">
+      <div class="bt-left">
+        <span id="battleModeTag" class="mode-pill">1v1 · BEST OF 3</span>
+        <span id="battleStageTag" class="stage-pill">Làng Lá</span>
+        <span id="battlePingTag" class="ping-pill hidden">Ping: --ms</span>
+      </div>
+      <div class="bt-right">
+        <button id="btnToggleSkillBar" class="bvn-btn ghost xs" type="button" title="Ẩn / Hiện Bảng Chiêu">
+          <svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="15" x2="21" y2="15" /></svg>
+          <span>Bảng Chiêu</span>
+        </button>
+        <button id="btnBattleRematch" class="bvn-btn secondary xs" type="button" title="Đấu Lại (Phím R)">
+          <svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="23 4 23 10 17 10" />
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+          </svg>
+          <span>Đấu Lại [R]</span>
+        </button>
+        <button id="btnBattlePause" class="bvn-btn ghost xs" type="button" title="Tạm Dừng (Phím ESC)">
+          <svg class="ico sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="6" y="4" width="4" height="16" />
+            <rect x="14" y="4" width="4" height="16" />
+          </svg>
+          <span>Tạm Dừng [ESC]</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="arena-stage-wrap">
+      <canvas id="gameCanvas" width="960" height="540"></canvas>
+      <div id="onlineChatToast" class="chat-toast hidden" role="status" aria-live="polite"></div>
+    </div>
+
+    <!-- SLEEK LIVE COMMAND DECK + ONLINE QUICK EMOTES -->
+    <div id="battleSkillBar" class="battle-skill-bar">
+      <div class="deck-player p1-deck">
+        <div class="deck-head">
+          <span class="p1-txt">P1 BỘ CHIÊU</span>
+          <span class="deck-hint"><kbd>O</kbd> Viện Trợ / Thoát · <kbd>J+K</kbd>/<kbd>P</kbd> Thức Tỉnh</span>
+        </div>
+        <div id="p1SkillPills" class="skill-pills"></div>
+      </div>
+
+      <div class="deck-player p2-deck" id="p2DeckContainer">
+        <div class="deck-head">
+          <span class="p2-txt">P2 BỘ CHIÊU</span>
+          <span class="deck-hint"><kbd>6</kbd> Viện Trợ / Thoát · <kbd>1+2</kbd>/<kbd>0</kbd> Thức Tỉnh</span>
+        </div>
+        <div id="p2SkillPills" class="skill-pills"></div>
+      </div>
+
+      <div id="onlineEmoteBar" class="online-emote-bar hidden">
+        <span class="emote-lbl">Chat nhanh:</span>
+        <button class="emote-btn" type="button" data-emote="GG! Quá hay!">GG!</button>
+        <button class="emote-btn" type="button" data-emote="Combo gắt quá!">Combo gắt!</button>
+        <button class="emote-btn" type="button" data-emote="Đấu lại ván nữa nào!">Đấu tiếp!</button>
+        <button class="emote-btn" type="button" data-emote="Né đỉnh đấy!">Né đỉnh!</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== MODALS ==================== -->
+  <!-- PROFILE MODAL -->
+  <div id="modalProfile" class="bvn-modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalProfileTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="modalProfileTitle">HỒ SƠ NGƯỜI CHƠI</h3>
+        <button class="modal-close" type="button" data-close-modal="modalProfile" aria-label="Đóng">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">Đặt tên nhanh không cần mật khẩu — tự động cấp Tag 4 số &amp; lưu Elo trên trình duyệt.</p>
+        <label class="field-label" for="inputP1Name">Tên Người Chơi 1 (dùng cho Online PvP):</label>
+        <div class="input-row">
+          <input id="inputP1Name" class="bvn-input" type="text" maxlength="16" placeholder="VD: AnhHai_VN..." />
+          <button id="btnP1Login" class="bvn-btn primary sm nowrap" type="button">Lưu P1</button>
+        </div>
+        <label class="field-label" for="inputP2Name">Tên Người Chơi 2 (Chơi 2P cùng máy):</label>
+        <div class="input-row">
+          <input id="inputP2Name" class="bvn-input" type="text" maxlength="16" placeholder="VD: Bro_P2..." />
+          <button id="btnP2Login" class="bvn-btn secondary sm nowrap" type="button">Lưu P2</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTROLS MODAL -->
+  <div id="modalControls" class="bvn-modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalControlsTitle">
+    <div class="modal-card wide">
+      <div class="modal-head">
+        <h3 id="modalControlsTitle">BẢNG PHÍM CHUẨN BLEACH VS NARUTO</h3>
+        <button class="modal-close" type="button" data-close-modal="modalControls" aria-label="Đóng">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="keymap-grid-modal">
+          <div class="km-col p1">
+            <h4>P1 · BÊN TRÁI (ONLINE PVP)</h4>
+            <div class="km-row"><span>Di chuyển Trái / Phải</span><span><kbd>A</kbd> <kbd>D</kbd></span></div>
+            <div class="km-row"><span>Lên / Đỡ Đòn (Thủ)</span><span><kbd>W</kbd> <kbd>S</kbd></span></div>
+            <div class="km-row"><span>Đánh Combo 4 đòn</span><span><kbd>J</kbd></span></div>
+            <div class="km-row"><span>Nhảy / Nhảy Kép</span><span><kbd>K</kbd></span></div>
+            <div class="km-row"><span>Thuấn Bộ Lướt / U Bộ</span><span><kbd>L</kbd> / <kbd>S</kbd>+<kbd>L</kbd></span></div>
+            <div class="km-row"><span>Chiêu Đặc Biệt</span><span><kbd>U</kbd> / <kbd>W</kbd>+<kbd>U</kbd> / <kbd>S</kbd>+<kbd>U</kbd></span></div>
+            <div class="km-row"><span>Đòn Hất / Xung Kích</span><span><kbd>W</kbd>+<kbd>J</kbd> / <kbd>S</kbd>+<kbd>J</kbd></span></div>
+            <div class="km-row"><span>Tuyệt Kỹ (1 Thanh Nộ)</span><span><kbd>I</kbd> / <kbd>W</kbd>+<kbd>I</kbd></span></div>
+            <div class="km-row"><span>Siêu Tuyệt Kỹ (3 Thanh Nộ)</span><span><kbd>S</kbd>+<kbd>I</kbd></span></div>
+            <div class="km-row"><span>Gọi Viện Trợ / Thế Thân Thoát</span><span><kbd>O</kbd></span></div>
+            <div class="km-row"><span>Thức Tỉnh / Vạn Giải (1.5 Nộ)</span><span><kbd>J</kbd>+<kbd>K</kbd> hoặc <kbd>P</kbd></span></div>
+          </div>
+          <div class="km-col p2">
+            <h4>P2 · 2P CÙNG MÁY (NUMPAD / SỐ 1..6)</h4>
+            <div class="km-row"><span>Di chuyển Trái / Phải</span><span><kbd>←</kbd> <kbd>→</kbd></span></div>
+            <div class="km-row"><span>Lên / Đỡ Đòn (Thủ)</span><span><kbd>↑</kbd> <kbd>↓</kbd></span></div>
+            <div class="km-row"><span>Đánh Combo 4 đòn</span><span><kbd>1</kbd></span></div>
+            <div class="km-row"><span>Nhảy / Nhảy Kép</span><span><kbd>2</kbd></span></div>
+            <div class="km-row"><span>Thuấn Bộ Lướt / U Bộ</span><span><kbd>3</kbd> / <kbd>↓</kbd>+<kbd>3</kbd></span></div>
+            <div class="km-row"><span>Chiêu Đặc Biệt</span><span><kbd>4</kbd> / <kbd>↑</kbd>+<kbd>4</kbd> / <kbd>↓</kbd>+<kbd>4</kbd></span></div>
+            <div class="km-row"><span>Đòn Hất / Xung Kích</span><span><kbd>↑</kbd>+<kbd>1</kbd> / <kbd>↓</kbd>+<kbd>1</kbd></span></div>
+            <div class="km-row"><span>Tuyệt Kỹ (1 Thanh Nộ)</span><span><kbd>5</kbd> / <kbd>↑</kbd>+<kbd>5</kbd></span></div>
+            <div class="km-row"><span>Siêu Tuyệt Kỹ (3 Thanh Nộ)</span><span><kbd>↓</kbd>+<kbd>5</kbd></span></div>
+            <div class="km-row"><span>Gọi Viện Trợ / Thế Thân Thoát</span><span><kbd>6</kbd></span></div>
+            <div class="km-row"><span>Thức Tỉnh / Vạn Giải (1.5 Nộ)</span><span><kbd>1</kbd>+<kbd>2</kbd> hoặc <kbd>0</kbd></span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUSTOM CHARACTER IMPORT MODAL -->
+  <div id="modalMugen" class="bvn-modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalMugenTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3 id="modalMugenTitle">NẠP NHÂN VẬT TÙY CHỈNH (.SFF / .AIR)</h3>
+        <button class="modal-close" type="button" data-close-modal="modalMugen" aria-label="Đóng">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p id="mugenLoaderStatus" class="mugen-status">
+          Toàn bộ đội hình mặc định đã sẵn sàng. Có thể nạp thêm tệp nhân vật tùy chỉnh từ máy tính cho P1 hoặc P2.
+        </p>
+        <label class="field-label" for="inputMugenFilesP1">Nạp tệp nhân vật cho P1 (.sff, .air, .def):</label>
+        <input id="inputMugenFilesP1" class="bvn-input file-input" type="file" multiple accept=".sff,.air,.def,.act,.cns,.cmd" />
+        <label class="field-label" for="inputMugenFilesP2">Nạp tệp nhân vật cho P2 (.sff, .air, .def):</label>
+        <input id="inputMugenFilesP2" class="bvn-input file-input" type="file" multiple accept=".sff,.air,.def,.act,.cns,.cmd" />
+      </div>
+    </div>
+  </div>
+
+  <!-- PAUSE MODAL (HOUSES STYLED HITBOX DEBUG SWITCH) -->
+  <div id="modalPause" class="bvn-modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalPauseTitle">
+    <div class="modal-card compact">
+      <div class="modal-head">
+        <h3 id="modalPauseTitle">TẠM DỪNG TRẬN ĐẤU</h3>
+        <button class="modal-close" type="button" data-close-modal="modalPause" aria-label="Đóng">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div class="modal-body stack-actions">
+        <button id="btnPauseResume" class="bvn-btn primary" type="button">
+          <svg class="ico" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="6 4 20 12 6 20 6 4" /></svg>
+          <span>Tiếp Tục Chiến Đấu</span>
+        </button>
+        <button id="btnPauseRematch" class="bvn-btn secondary" type="button">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="23 4 23 10 17 10" />
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+          </svg>
+          <span>Đấu Lại Từ Đầu</span>
+        </button>
+        <button id="btnPauseChangeChar" class="bvn-btn ghost" type="button">Chọn Lại Tướng &amp; Đội Hình</button>
+        <button id="btnPauseChangeMap" class="bvn-btn ghost" type="button">Đổi Đấu Trường</button>
+
+        <div class="pause-setting-row">
+          <div class="pause-setting-info">
+            <strong>Khung Hitbox (Training)</strong>
+            <small>Hiện vùng đánh &amp; nhận sát thương</small>
+          </div>
+          <label class="arcade-switch" for="chkMugenHitbox" aria-label="Bật hoặc tắt khung Hitbox">
+            <input id="chkMugenHitbox" type="checkbox" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </label>
+        </div>
+
+        <button id="btnPauseMenu" class="bvn-btn danger" type="button">Về Menu Chính</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BVN VICTORY / REMATCH MODAL -->
+  <div id="modalVictory" class="bvn-modal hidden" role="dialog" aria-modal="true" aria-labelledby="victoryTitle">
+    <div class="modal-card victory-card">
+      <div class="victory-banner">
+        <span id="victoryBadge" class="victory-kicker">VICTORY</span>
+        <h2 id="victoryTitle">P1 CHIẾN THẮNG!</h2>
+      </div>
+      <div class="victory-body">
+        <div class="victory-portrait-box">
+          <img id="victoryPortrait" src="avatars/naruto_big.png" alt="Winner" />
+        </div>
+        <div class="victory-details">
+          <h3 id="victoryFighterName">Uzumaki Naruto</h3>
+          <p id="victorySubText">Trận đấu kết thúc ấn tượng!</p>
+          <div class="victory-stats">
+            <div class="v-stat"><span id="vStatScore">2 - 0</span><small>Tỷ Số</small></div>
+            <div class="v-stat"><span id="vStatCombo">0 HITS</span><small>Max Combo</small></div>
+            <div class="v-stat"><span id="vStatElo">+24 Elo</span><small>Xếp Hạng</small></div>
+          </div>
+          <div id="victoryOnlineNote" class="victory-online-note hidden"></div>
+          <div class="victory-actions">
+            <button id="btnVictoryRematch" class="bvn-btn primary" type="button">ĐẤU LẠI (REMATCH)</button>
+            <button id="btnVictorySelect" class="bvn-btn secondary" type="button">Đổi Tướng</button>
+            <button id="btnVictoryMap" class="bvn-btn ghost" type="button">Đổi Bản Đồ</button>
+            <button id="btnVictoryMenu" class="bvn-btn ghost" type="button">Về Menu</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROOM PASSWORD MODAL (FOR LOCKED ROOMS / INVITE LINKS) -->
+  <div id="modalRoomPassword" class="bvn-modal hidden" role="dialog" aria-modal="true" aria-labelledby="modalRoomPwdTitle">
+    <div class="modal-card compact">
+      <div class="modal-head">
+        <h3 id="modalRoomPwdTitle">PHÒNG CÓ MẬT KHẨU</h3>
+        <button class="modal-close" type="button" data-close-modal="modalRoomPassword" aria-label="Đóng">
+          <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">Nhập mật khẩu để vào phòng <strong id="pwdModalRoomCode">------</strong>:</p>
+        <input id="inputRoomModalPassword" class="bvn-input" type="password" maxlength="24" placeholder="Nhập mật khẩu phòng..." autocomplete="off" />
+        <div id="pwdModalError" class="lobby-error hidden" role="alert"></div>
+        <div class="pwd-modal-actions">
+          <button class="bvn-btn ghost sm" type="button" data-close-modal="modalRoomPassword">Hủy</button>
+          <button id="btnConfirmRoomPassword" class="bvn-btn primary sm" type="button">Vào Phòng</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPTS (ORDERED DEPENDENCIES) -->
+  <script src="config.js"></script>
+  <script src="roster.js"></script>
+  <script src="roster-extra.js"></script>
+  <script src="mugen-presets-extra.js"></script>
+  <script src="maps.js"></script>
+  <script src="mugen-loader.js"></script>
+  <script src="netplay.js"></script>
+  <script src="engine.js"></script>
+  <script src="bvn-ui.js"></script>
+</body>
+</html>

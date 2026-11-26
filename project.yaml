@@ -1,0 +1,30 @@
+# Claude Code Game Studios — Web Game Directory Configuration (Web 2D Fighting)
+project:
+  name: "Anime Multiverse Fighter (BVN Crossover)"
+  genre: "fighting"
+  secondary_genre: "competitive-multiplayer"
+  stage: "prototype"
+
+engine:
+  name: "Web"
+  language: "JavaScript"
+  rendering: "Canvas 2D"
+  physics: "none"
+  code_root: "."
+
+specialists:
+  code: "lead-programmer"
+  shader: "lead-programmer"
+  ui: "lead-programmer"
+  additional: []
+
+naming:
+  classes: PascalCase
+  variables: camelCase
+  constants: SCREAMING_SNAKE
+  signals: on_event_name
+  files: kebab-case
+  scenes: snake_case
+
+commands:
+  run: "node server.js"

@@ -1,0 +1,23 @@
+# Large M.U.G.E.N sprite/animation packs (~960 MB — hosted on Cloudflare R2)
+chars/
+
+# Explicitly keep lightweight avatar portraits & manifest tracked (~2.5 MB, served by Vercel)
+!avatars/
+!avatars/**
+
+# Tooling & agent directories
+.agents/
+.claude/
+.wrangler/
+node_modules/
+
+# Secrets & environment files (never commit credentials)
+.env
+.env.*
+
+# Logs, OS junk & temporary files
+*.log
+.DS_Store
+Thumbs.db
+tmp/
+*.tmp

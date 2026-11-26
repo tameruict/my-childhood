@@ -1,0 +1,380 @@
+{
+  "naruto": {
+    "icon": "avatars/naruto.png",
+    "big": "avatars/naruto_big.png",
+    "iconSource": "9000,0 (24x23)",
+    "bigSource": "9000,1 (93x96)"
+  },
+  "sasuke": {
+    "icon": "avatars/sasuke.png",
+    "big": "avatars/sasuke_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "9000,1 (120x140)"
+  },
+  "itachi": {
+    "icon": "avatars/itachi.png",
+    "big": "avatars/itachi_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "9000,1 (120x140)"
+  },
+  "kakashi": {
+    "icon": "avatars/kakashi.png",
+    "big": "avatars/kakashi_big.png",
+    "iconSource": "9000,0 (25x23)",
+    "bigSource": "9000,1 (117x140)"
+  },
+  "luffy": {
+    "icon": "avatars/luffy.png",
+    "big": "avatars/luffy_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "9000,1 (41x64)"
+  },
+  "zoro": {
+    "icon": "avatars/zoro.png",
+    "big": "avatars/zoro_big.png",
+    "iconSource": "9000,0 (63x67)",
+    "bigSource": "9000,1 (329x625)"
+  },
+  "goku": {
+    "icon": "avatars/goku.png",
+    "big": "avatars/goku_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "9000,1 (120x140)"
+  },
+  "vegeta": {
+    "icon": "avatars/vegeta.png",
+    "big": "avatars/vegeta_big.png",
+    "iconSource": "9000,0 (24x25)",
+    "bigSource": "9000,1 (120x140)"
+  },
+  "gon": {
+    "icon": "avatars/gon.png",
+    "big": "avatars/gon_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "idle (33x44)"
+  },
+  "killua": {
+    "icon": "avatars/killua.png",
+    "big": "avatars/killua_big.png",
+    "iconSource": "9000,0 (20x25)",
+    "bigSource": "idle (20x49)"
+  },
+  "kurapika": {
+    "icon": "avatars/kurapika.png",
+    "big": "avatars/kurapika_big.png",
+    "iconSource": "9000,0 (126x126)",
+    "bigSource": "idle (26x49)"
+  },
+  "hisoka": {
+    "icon": "avatars/hisoka.png",
+    "big": "avatars/hisoka_big.png",
+    "iconSource": "9000,0 (126x126)",
+    "bigSource": "idle (29x56)"
+  },
+  "meruem": {
+    "icon": "avatars/meruem.png",
+    "big": "avatars/meruem_big.png",
+    "iconSource": "9000,0 (126x126)",
+    "bigSource": "idle (39x49)"
+  },
+  "netero": {
+    "icon": "avatars/netero.png",
+    "big": "avatars/netero_big.png",
+    "iconSource": "idle (36x59)",
+    "bigSource": "idle (36x59)"
+  },
+  "chrollo": {
+    "icon": "avatars/chrollo.png",
+    "big": "avatars/chrollo_big.png",
+    "iconSource": "9000,0 (126x126)",
+    "bigSource": "idle (19x52)"
+  },
+  "feitan": {
+    "icon": "avatars/feitan.png",
+    "big": "avatars/feitan_big.png",
+    "iconSource": "9000,0 (126x126)",
+    "bigSource": "idle (39x38)"
+  },
+  "pitou": {
+    "icon": "avatars/pitou.png",
+    "big": "avatars/pitou_big.png",
+    "iconSource": "9000,0 (126x126)",
+    "bigSource": "idle (43x48)"
+  },
+  "ichigo": {
+    "icon": "avatars/ichigo.png",
+    "big": "avatars/ichigo_big.png",
+    "iconSource": "9000,0 (17x25)",
+    "bigSource": "idle (48x55)"
+  },
+  "gojo": {
+    "icon": "avatars/gojo.png",
+    "big": "avatars/gojo_big.png",
+    "iconSource": "9000,0 (19x24)",
+    "bigSource": "9000,1 (120x140)"
+  },
+  "tanjiro": {
+    "icon": "avatars/tanjiro.png",
+    "big": "avatars/tanjiro_big.png",
+    "iconSource": "9000,0 (74x74)",
+    "bigSource": "9000,1 (1280x703)"
+  },
+  "jotaro": {
+    "icon": "avatars/jotaro.png",
+    "big": "avatars/jotaro_big.png",
+    "iconSource": "9000,0 (21x25)",
+    "bigSource": "9000,1 (34x56)"
+  },
+  "saitama": {
+    "icon": "avatars/saitama.png",
+    "big": "avatars/saitama_big.png",
+    "iconSource": "9000,0 (21x25)",
+    "bigSource": "9000,1 (31x57)"
+  },
+  "genos": {
+    "icon": "avatars/genos.png",
+    "big": "avatars/genos_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "idle (34x52)"
+  },
+  "tatsumaki": {
+    "icon": "avatars/tatsumaki.png",
+    "big": "avatars/tatsumaki_big.png",
+    "iconSource": "9000,0 (24x25)",
+    "bigSource": "idle (30x52)"
+  },
+  "dio": {
+    "icon": "avatars/dio.png",
+    "big": "avatars/dio_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "9000,1 (25x63)"
+  },
+  "natsu": {
+    "icon": "avatars/natsu.png",
+    "big": "avatars/natsu_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "idle (35x52)"
+  },
+  "erza": {
+    "icon": "avatars/erza.png",
+    "big": "avatars/erza_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "9000,1 (31x56)"
+  },
+  "meliodas": {
+    "icon": "avatars/meliodas.png",
+    "big": "avatars/meliodas_big.png",
+    "iconSource": "9000,0 (23x25)",
+    "bigSource": "idle (19x48)"
+  },
+  "deku": {
+    "icon": "avatars/deku.png",
+    "big": "avatars/deku_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "idle (30x48)"
+  },
+  "bakugo": {
+    "icon": "avatars/bakugo.png",
+    "big": "avatars/bakugo_big.png",
+    "iconSource": "9000,0 (21x25)",
+    "bigSource": "idle (30x53)"
+  },
+  "eren": {
+    "icon": "avatars/eren.png",
+    "big": "avatars/eren_big.png",
+    "iconSource": "9000,0 (20x25)",
+    "bigSource": "idle (32x49)"
+  },
+  "kaneki": {
+    "icon": "avatars/kaneki.png",
+    "big": "avatars/kaneki_big.png",
+    "iconSource": "9000,0 (22x25)",
+    "bigSource": "9000,1 (59x67)"
+  },
+  "kirito": {
+    "icon": "avatars/kirito.png",
+    "big": "avatars/kirito_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "idle (51x49)"
+  },
+  "kenshin": {
+    "icon": "avatars/kenshin.png",
+    "big": "avatars/kenshin_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "idle (29x53)"
+  },
+  "yugi": {
+    "icon": "avatars/yugi.png",
+    "big": "avatars/yugi_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "9000,1 (29x58)"
+  },
+  "yusuke": {
+    "icon": "avatars/yusuke.png",
+    "big": "avatars/yusuke_big.png",
+    "iconSource": "9000,0 (126x126)",
+    "bigSource": "idle (29x50)"
+  },
+  "hiei": {
+    "icon": "avatars/hiei.png",
+    "big": "avatars/hiei_big.png",
+    "iconSource": "9000,0 (126x126)",
+    "bigSource": "idle (32x47)"
+  },
+  "goku_ui": {
+    "icon": "avatars/goku_ui.png",
+    "big": "avatars/goku_ui_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "9000,1 (32x65)"
+  },
+  "goku_black": {
+    "icon": "avatars/goku_black.png",
+    "big": "avatars/goku_black_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "9000,1 (120x140)"
+  },
+  "frieza": {
+    "icon": "avatars/frieza.png",
+    "big": "avatars/frieza_big.png",
+    "iconSource": "9000,0 (19x24)",
+    "bigSource": "9000,1 (120x140)"
+  },
+  "cell": {
+    "icon": "avatars/cell.png",
+    "big": "avatars/cell_big.png",
+    "iconSource": "9000,0 (20x25)",
+    "bigSource": "9000,1 (120x140)"
+  },
+  "kid_buu": {
+    "icon": "avatars/kid_buu.png",
+    "big": "avatars/kid_buu_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "9000,1 (120x140)"
+  },
+  "gogeta": {
+    "icon": "avatars/gogeta.png",
+    "big": "avatars/gogeta_big.png",
+    "iconSource": "9000,0 (22x25)",
+    "bigSource": "9000,1 (120x140)"
+  },
+  "vegito": {
+    "icon": "avatars/vegito.png",
+    "big": "avatars/vegito_big.png",
+    "iconSource": "9000,0 (22x25)",
+    "bigSource": "9000,1 (120x140)"
+  },
+  "gohan": {
+    "icon": "avatars/gohan.png",
+    "big": "avatars/gohan_big.png",
+    "iconSource": "9000,0 (23x25)",
+    "bigSource": "9000,1 (120x140)"
+  },
+  "trunks": {
+    "icon": "avatars/trunks.png",
+    "big": "avatars/trunks_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "9000,1 (120x140)"
+  },
+  "naruto_ashura": {
+    "icon": "avatars/naruto_ashura.png",
+    "big": "avatars/naruto_ashura_big.png",
+    "iconSource": "9000,0 (25x25)",
+    "bigSource": "9000,1 (35x58)"
+  },
+  "naruto_kurama": {
+    "icon": "avatars/naruto_kurama.png",
+    "big": "avatars/naruto_kurama_big.png",
+    "iconSource": "9000,9 (479x150)",
+    "bigSource": "2300,0 (626x349)"
+  },
+  "obito": {
+    "icon": "avatars/obito.png",
+    "big": "avatars/obito_big.png",
+    "iconSource": "9000,0 (56x28)",
+    "bigSource": "9000,1 (1280x1440)"
+  },
+  "shikamaru": {
+    "icon": "avatars/shikamaru.png",
+    "big": "avatars/shikamaru_big.png",
+    "iconSource": "9000,0 (20x25)",
+    "bigSource": "9000,1 (120x140)"
+  },
+  "deidara": {
+    "icon": "avatars/deidara.png",
+    "big": "avatars/deidara_big.png",
+    "iconSource": "9000,0 (30x30)",
+    "bigSource": "9000,1 (229x507)"
+  },
+  "hinata": {
+    "icon": "avatars/hinata.png",
+    "big": "avatars/hinata_big.png",
+    "iconSource": "9000,1 bust_crop (303x520)",
+    "bigSource": "9000,1 (303x520)"
+  },
+  "minato": {
+    "icon": "avatars/minato.png",
+    "big": "avatars/minato_big.png",
+    "iconSource": "9000,0 (38x38)",
+    "bigSource": "9000,1 (320x120)"
+  },
+  "gaara": {
+    "icon": "avatars/gaara.png",
+    "big": "avatars/gaara_big.png",
+    "iconSource": "9000,0 (22x24)",
+    "bigSource": "9000,1 (119x96)"
+  },
+  "rock_lee": {
+    "icon": "avatars/rock_lee.png",
+    "big": "avatars/rock_lee_big.png",
+    "iconSource": "9000,0 (35x51)",
+    "bigSource": "9000,1 (320x120)"
+  },
+  "madara": {
+    "icon": "avatars/madara.png",
+    "big": "avatars/madara_big.png",
+    "iconSource": "9000,0 (58x28)",
+    "bigSource": "9000,1 (1280x1440)"
+  },
+  "gon_adult": {
+    "icon": "avatars/gon_adult.png",
+    "big": "avatars/gon_adult_big.png",
+    "iconSource": "9000,0 (126x126)",
+    "bigSource": "idle (33x44)"
+  },
+  "killua_godspeed": {
+    "icon": "avatars/killua_godspeed.png",
+    "big": "avatars/killua_godspeed_big.png",
+    "iconSource": "9000,0 (126x126)",
+    "bigSource": "idle (20x49)"
+  },
+  "sukuna": {
+    "icon": "avatars/sukuna.png",
+    "big": "avatars/sukuna_big.png",
+    "iconSource": "9000,0 (19x25)",
+    "bigSource": "9000,1 (118x140)"
+  },
+  "zenitsu": {
+    "icon": "avatars/zenitsu.png",
+    "big": "avatars/zenitsu_big.png",
+    "iconSource": "9000,0 (74x74)",
+    "bigSource": "9000,1 (1280x703)"
+  },
+  "ace": {
+    "icon": "avatars/ace.png",
+    "big": "avatars/ace_big.png",
+    "iconSource": "9000,0 (68x67)",
+    "bigSource": "9000,1 (331x599)"
+  },
+  "law": {
+    "icon": "avatars/law.png",
+    "big": "avatars/law_big.png",
+    "iconSource": "9000,0 (30x30)",
+    "bigSource": "9000,1 (326x613)"
+  },
+  "aizen": {
+    "icon": "avatars/aizen.png",
+    "big": "avatars/aizen_big.png",
+    "iconSource": "9000,0 (25x23)",
+    "bigSource": "9000,1 (174x223)"
+  }
+}

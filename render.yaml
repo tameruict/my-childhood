@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: anime-crossover-bvn-ws
+    runtime: node
+    plan: free
+    buildCommand: ""
+    startCommand: node server.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production

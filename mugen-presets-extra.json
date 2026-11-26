@@ -1,0 +1,409 @@
+{
+  "saitama": {
+    "defUrl": "chars/saitama/Saitama.def",
+    "sffUrl": "chars/saitama/Saitama.sff",
+    "airUrl": "chars/saitama/Saitama.air",
+    "actUrl": "chars/saitama/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 665,
+    "actions": 145
+  },
+  "genos": {
+    "defUrl": "chars/genos/Genos.def",
+    "sffUrl": "chars/genos/Genos.sff",
+    "airUrl": "chars/genos/Genos.air",
+    "actUrl": "chars/genos/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 879,
+    "actions": 140
+  },
+  "tatsumaki": {
+    "defUrl": "chars/tatsumaki/Tatsumaki.def",
+    "sffUrl": "chars/tatsumaki/Tatsumaki.sff",
+    "airUrl": "chars/tatsumaki/Tatsumaki.air",
+    "actUrl": "chars/tatsumaki/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 756,
+    "actions": 133
+  },
+  "dio": {
+    "defUrl": "chars/dio/SM_Dio.def",
+    "sffUrl": "chars/dio/SM_Dio.sff",
+    "airUrl": "chars/dio/SM_Dio.air",
+    "actUrl": "chars/dio/1.act",
+    "sffVersion": "v1.0",
+    "sprites": 1032,
+    "actions": 237
+  },
+  "natsu": {
+    "defUrl": "chars/natsu/Natsu_DragonForce.def",
+    "sffUrl": "chars/natsu/Natsu_DragonForce.sff",
+    "airUrl": "chars/natsu/Natsu_DragonForce.air",
+    "actUrl": "chars/natsu/1.act",
+    "sffVersion": "v1.0",
+    "sprites": 942,
+    "actions": 126
+  },
+  "erza": {
+    "defUrl": "chars/erza/Erza_Start.def",
+    "sffUrl": "chars/erza/Erza_Start.sff",
+    "airUrl": "chars/erza/Erza_Start.air",
+    "actUrl": "chars/erza/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 878,
+    "actions": 156
+  },
+  "meliodas": {
+    "defUrl": "chars/meliodas/Meliodas.def",
+    "sffUrl": "chars/meliodas/Meliodas.sff",
+    "airUrl": "chars/meliodas/Meliodas.air",
+    "actUrl": "chars/meliodas/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 798,
+    "actions": 147
+  },
+  "deku": {
+    "defUrl": "chars/deku/Izuku_Midoriya.def",
+    "sffUrl": "chars/deku/Izuku_Midoriya.sff",
+    "airUrl": "chars/deku/Izuku_Midoriya.air",
+    "actUrl": "chars/deku/Deku1.act",
+    "sffVersion": "v2.0",
+    "sprites": 1359,
+    "actions": 283
+  },
+  "bakugo": {
+    "defUrl": "chars/bakugo/Katsuki_Bakugo.def",
+    "sffUrl": "chars/bakugo/Katsuki_Bakugo.sff",
+    "airUrl": "chars/bakugo/Katsuki_Bakugo.air",
+    "actUrl": "chars/bakugo/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 607,
+    "actions": 122
+  },
+  "eren": {
+    "defUrl": "chars/eren/Eren.def",
+    "sffUrl": "chars/eren/Eren.sff",
+    "airUrl": "chars/eren/Eren.air",
+    "actUrl": "chars/eren/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 891,
+    "actions": 169
+  },
+  "kaneki": {
+    "defUrl": "chars/kaneki/Kaneki.def",
+    "sffUrl": "chars/kaneki/Kaneki.sff",
+    "airUrl": "chars/kaneki/Kaneki.air",
+    "actUrl": "chars/kaneki/1.act",
+    "sffVersion": "v1.0",
+    "sprites": 678,
+    "actions": 147
+  },
+  "kirito": {
+    "defUrl": "chars/kirito/Kirito.def",
+    "sffUrl": "chars/kirito/Kirito.sff",
+    "airUrl": "chars/kirito/Kirito.air",
+    "actUrl": "chars/kirito/1.act",
+    "sffVersion": "v1.0",
+    "sprites": 932,
+    "actions": 155
+  },
+  "goku_ui": {
+    "defUrl": "chars/goku_ui/Goku_Migatte.def",
+    "sffUrl": "chars/goku_ui/Goku_Migatte.sff",
+    "airUrl": "chars/goku_ui/Goku_Migatte.air",
+    "actUrl": "chars/goku_ui/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 875,
+    "actions": 174
+  },
+  "naruto_ashura": {
+    "defUrl": "chars/naruto_ashura/Naruto_Ashura_JUS.def",
+    "sffUrl": "chars/naruto_ashura/Naruto_Ashura_JUS.sff",
+    "airUrl": "chars/naruto_ashura/Naruto_Ashura_JUS.air",
+    "actUrl": "chars/naruto_ashura/1.act",
+    "sffVersion": "v1.0",
+    "sprites": 1305,
+    "actions": 236
+  },
+  "kenshin": {
+    "defUrl": "chars/kenshin/SM_Kenshin.def",
+    "sffUrl": "chars/kenshin/SM_Kenshin.sff",
+    "airUrl": "chars/kenshin/SM_Kenshin.air",
+    "actUrl": "chars/kenshin/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 964,
+    "actions": 235
+  },
+  "yugi": {
+    "defUrl": "chars/yugi/Yugi.def",
+    "sffUrl": "chars/yugi/Yugi.sff",
+    "airUrl": "chars/yugi/Yugi.air",
+    "actUrl": "chars/yugi/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 1014,
+    "actions": 245
+  },
+  "goku_black": {
+    "defUrl": "chars/goku_black/Black_Goku_Normal_JUS.def",
+    "sffUrl": "chars/goku_black/Black_Goku_Normal_JUS.sff",
+    "airUrl": "chars/goku_black/Black_Goku_Normal_JUS.air",
+    "actUrl": "chars/goku_black/Black_Goku_Normal_JUS.act",
+    "sffVersion": "v1.0",
+    "sprites": 443,
+    "actions": 127
+  },
+  "frieza": {
+    "defUrl": "chars/frieza/Freezer_4_Form.def",
+    "sffUrl": "chars/frieza/Freezer_4_Form.sff",
+    "airUrl": "chars/frieza/Freezer_4_Form.air",
+    "actUrl": "chars/frieza/1.act",
+    "sffVersion": "v1.0",
+    "sprites": 908,
+    "actions": 145
+  },
+  "cell": {
+    "defUrl": "chars/cell/Cell_Perfect_Form.def",
+    "sffUrl": "chars/cell/Cell_Perfect_Form.sff",
+    "airUrl": "chars/cell/Cell_Perfect_Form.air",
+    "actUrl": "chars/cell/1.act",
+    "sffVersion": "v1.0",
+    "sprites": 733,
+    "actions": 131
+  },
+  "kid_buu": {
+    "defUrl": "chars/kid_buu/Kid_Buu.def",
+    "sffUrl": "chars/kid_buu/Kid_Buu.sff",
+    "airUrl": "chars/kid_buu/Kid_Buu.air",
+    "actUrl": "chars/kid_buu/1.act",
+    "sffVersion": "v1.0",
+    "sprites": 774,
+    "actions": 137
+  },
+  "gogeta": {
+    "defUrl": "chars/gogeta/New_Gogeta_SSJ_JUS.def",
+    "sffUrl": "chars/gogeta/New_Gogeta_SSJ_JUS.sff",
+    "airUrl": "chars/gogeta/New_Gogeta_SSJ_JUS.air",
+    "actUrl": "chars/gogeta/New_Gogeta_SSJ_JUS.act",
+    "sffVersion": "v1.0",
+    "sprites": 508,
+    "actions": 129
+  },
+  "vegito": {
+    "defUrl": "chars/vegito/VegitoSSJ_JUS.def",
+    "sffUrl": "chars/vegito/VegitoSSJ_JUS.sff",
+    "airUrl": "chars/vegito/VegitoSSJ_JUS.air",
+    "actUrl": "chars/vegito/VegitoSSJ_JUS.act",
+    "sffVersion": "v1.0",
+    "sprites": 377,
+    "actions": 125
+  },
+  "gohan": {
+    "defUrl": "chars/gohan/Gohan_Ultimate.def",
+    "sffUrl": "chars/gohan/Gohan_Ultimate.sff",
+    "airUrl": "chars/gohan/Gohan_Ultimate.air",
+    "actUrl": "chars/gohan/1.act",
+    "sffVersion": "v1.0",
+    "sprites": 741,
+    "actions": 125
+  },
+  "trunks": {
+    "defUrl": "chars/trunks/Trunks_Future_SS.def",
+    "sffUrl": "chars/trunks/Trunks_Future_SS.sff",
+    "airUrl": "chars/trunks/Trunks_Future_SS.air",
+    "actUrl": "chars/trunks/1.act",
+    "sffVersion": "v1.0",
+    "sprites": 817,
+    "actions": 137
+  },
+  "gon_adult": {
+    "defUrl": "chars/gon_adult/Gon2.def",
+    "sffUrl": "chars/gon_adult/Gon.sff",
+    "airUrl": "chars/gon_adult/Gon.air",
+    "actUrl": "chars/gon_adult/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 739,
+    "actions": 132
+  },
+  "killua_godspeed": {
+    "defUrl": "chars/killua_godspeed/Killua2.def",
+    "sffUrl": "chars/killua_godspeed/Killua.sff",
+    "airUrl": "chars/killua_godspeed/Killua.air",
+    "actUrl": "chars/killua_godspeed/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 648,
+    "actions": 135
+  },
+  "yusuke": {
+    "defUrl": "chars/yusuke/Yusuke.def",
+    "sffUrl": "chars/yusuke/Yusuke.sff",
+    "airUrl": "chars/yusuke/Yusuke.air",
+    "actUrl": "chars/yusuke/Yusuke.act",
+    "sffVersion": "v2.0",
+    "sprites": 888,
+    "actions": 255
+  },
+  "hiei": {
+    "defUrl": "chars/hiei/Hiei.def",
+    "sffUrl": "chars/hiei/Hiei.sff",
+    "airUrl": "chars/hiei/Hiei.air",
+    "actUrl": "chars/hiei/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 787,
+    "actions": 137
+  },
+  "minato": {
+    "defUrl": "chars/minato/Yondaime.def",
+    "sffUrl": "chars/minato/Yondaime.sff",
+    "airUrl": "chars/minato/Yondaime.air",
+    "actUrl": "chars/minato/Yondaime.act",
+    "sffVersion": "v1.0",
+    "sprites": 250,
+    "actions": 115
+  },
+  "gaara": {
+    "defUrl": "chars/gaara/Sabaku_no_Gaara.def",
+    "sffUrl": "chars/gaara/Gaara.sff",
+    "airUrl": "chars/gaara/Gaara.air",
+    "actUrl": "chars/gaara/Gaarapalette.act",
+    "sffVersion": "v1.0",
+    "sprites": 94,
+    "actions": 59
+  },
+  "rock_lee": {
+    "defUrl": "chars/rock_lee/rLee.def",
+    "sffUrl": "chars/rock_lee/lee.sff",
+    "airUrl": "chars/rock_lee/lee.air",
+    "actUrl": "chars/rock_lee/lee.act",
+    "sffVersion": "v1.0",
+    "sprites": 488,
+    "actions": 136
+  },
+  "zoro": {
+    "defUrl": "chars/zoro/SM_Zoro_TS.def",
+    "sffUrl": "chars/zoro/SM_Zoro_TS.sff",
+    "airUrl": "chars/zoro/SM_Zoro_TS.air",
+    "actUrl": "chars/zoro/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 1347,
+    "actions": 267
+  },
+  "ace": {
+    "defUrl": "chars/ace/Ace.def",
+    "sffUrl": "chars/ace/Ace.sff",
+    "airUrl": "chars/ace/Ace.air",
+    "actUrl": "chars/ace/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 1021,
+    "actions": 156
+  },
+  "law": {
+    "defUrl": "chars/law/LawTS.def",
+    "sffUrl": "chars/law/LawTS.sff",
+    "airUrl": "chars/law/LawTS.air",
+    "actUrl": "chars/law/LawTS.act",
+    "sffVersion": "v2.0",
+    "sprites": 662,
+    "actions": 180
+  },
+  "madara": {
+    "defUrl": "chars/madara/Madara_Rikudou.def",
+    "sffUrl": "chars/madara/Madara_Rikudou.sff",
+    "airUrl": "chars/madara/Madara_Rikudou.air",
+    "actUrl": "chars/madara/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 797,
+    "actions": 240
+  },
+  "aizen": {
+    "defUrl": "chars/aizen/Ultimate_Aizen.def",
+    "sffUrl": "chars/aizen/Ultimate_Aizen.sff",
+    "airUrl": "chars/aizen/Ultimate_Aizen.air",
+    "actUrl": "chars/aizen/aizen.act",
+    "sffVersion": "v1.0",
+    "sprites": 1253,
+    "actions": 284
+  },
+  "tanjiro": {
+    "defUrl": "chars/tanjiro/Tanjiro_all_forms.def",
+    "sffUrl": "chars/tanjiro/spr.sff",
+    "airUrl": "chars/tanjiro/Tanjiro.air",
+    "actUrl": "chars/tanjiro/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 2841,
+    "actions": 459
+  },
+  "zenitsu": {
+    "defUrl": "chars/zenitsu/Zenitsu_Agatsuma.def",
+    "sffUrl": "chars/zenitsu/Zenitsu_Agatsuma.sff",
+    "airUrl": "chars/zenitsu/Zenitsu_Agatsuma.air",
+    "actUrl": "chars/zenitsu/1.act",
+    "sffVersion": "v2.0",
+    "sprites": 950,
+    "actions": 206
+  },
+  "gojo": {
+    "defUrl": "chars/gojo/Gojo.def",
+    "sffUrl": "chars/gojo/Satoru.sff",
+    "airUrl": "chars/gojo/Satoru.air",
+    "actUrl": null,
+    "sffVersion": "v2.0",
+    "sprites": 1344,
+    "actions": 317
+  },
+  "sukuna": {
+    "defUrl": "chars/sukuna/Sukuna_Ryomen_S1.def",
+    "sffUrl": "chars/sukuna/Sukuna.sff",
+    "airUrl": "chars/sukuna/Sukuna.air",
+    "actUrl": null,
+    "sffVersion": "v2.0",
+    "sprites": 1830,
+    "actions": 335
+  },
+  "obito": {
+    "defUrl": "chars/obito/Obito_Juubi_Jinchuriki.def",
+    "sffUrl": "chars/obito/Obito_Juubi_Jinchuriki.sff",
+    "airUrl": "chars/obito/Obito_Juubi_Jinchuriki.air",
+    "actUrl": null,
+    "sffVersion": "v2.0",
+    "sprites": 1022,
+    "actions": 204
+  },
+  "deidara": {
+    "defUrl": "chars/deidara/Ba_Deidara_J-NS.def",
+    "sffUrl": "chars/deidara/Ba_Deidara_J-NS.sff",
+    "airUrl": "chars/deidara/Ba_Deidara_J-NS.air",
+    "actUrl": "chars/deidara/Ba_Deidara_J-NS.act",
+    "sffVersion": "v1.0",
+    "sprites": 714,
+    "actions": 178
+  },
+  "hinata": {
+    "defUrl": "chars/hinata/SK_Hinata.def",
+    "sffUrl": "chars/hinata/SK_Hinata.sff",
+    "airUrl": "chars/hinata/SK_Hinata.air",
+    "actUrl": "chars/hinata/SK_Hinata_Pal1.act",
+    "sffVersion": "v1.0",
+    "sprites": 1654,
+    "actions": 291
+  },
+  "shikamaru": {
+    "defUrl": "chars/shikamaru/cshikamaru.def",
+    "sffUrl": "chars/shikamaru/cshikamaru.sff",
+    "airUrl": "chars/shikamaru/cshikamaru.air",
+    "actUrl": "chars/shikamaru/cshikamaru.act",
+    "sffVersion": "v1.0",
+    "sprites": 286,
+    "actions": 131
+  },
+  "naruto_kurama": {
+    "defUrl": "chars/naruto_ashura/Naruto_Ashura_JUS.def",
+    "sffUrl": "chars/naruto_ashura/Naruto_Ashura_JUS.sff",
+    "airUrl": "chars/naruto_ashura/Naruto_Ashura_JUS.air",
+    "actUrl": "chars/naruto_ashura/1.act",
+    "sffVersion": "v1.0",
+    "sprites": 1305,
+    "actions": 236,
+    "baseActionOffset": 10000,
+    "baseScaleMult": 1.42
+  }
+}
