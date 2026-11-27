@@ -54,8 +54,18 @@
       this.selectedMapCat = 'all';
       this.selectedMapId = (Array.isArray(window.GAME_MAPS) && window.GAME_MAPS[0]) ? window.GAME_MAPS[0].id : 'konoha_village';
       this.mapThumbCache = new Map();
+      this._mapThumbScratchCanvas = null;
+      this._mapThumbRenderGen = 0;
+      this._mapThumbBatchHandle = null;
+      this._mapThumbBatchIsTimeout = false;
       this.mapPreviewFrame = 0;
       this.mapPreviewAnimId = null;
+
+      // Avatar grid cache (build once, filter via .hidden)
+      this._avatarGridBuiltCount = -1;
+      this._avatarTileEntries = [];
+      this._avatarRandTile = null;
+      this._avatarEmptyEl = null;
 
       // Menu keyboard focus & UI state
       this.menuFocusIdx = 0;
@@ -1884,19 +1894,9 @@
       });
     }
 
-    renderAvatarGrid() {
-      const grid = document.getElementById('selAvatarGrid');
-      if (!grid) return;
-      const list = this.getFilteredRoster();
+    buildAvatarGridTiles(grid) {
       grid.innerHTML = '';
-
-      if (list.length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'avatar-grid-empty';
-        empty.innerHTML = `<span>Không tìm thấy chiến binh phù hợp.</span>`;
-        grid.appendChild(empty);
-        return;
-      }
+      this._avatarTileEntries = [];
 
       // First tile: Iconic BVN Random (?) tile
       const randTile = document.createElement('button');
@@ -1905,20 +1905,25 @@
       randTile.title = 'Chọn ngẫu nhiên 1 chiến binh';
       randTile.innerHTML = `<div class="random-q" aria-hidden="true">?</div><div class="avatar-tile-name">NGẪU NHIÊN</div>`;
       randTile.addEventListener('click', () => {
-        const pool = list.length ? list : this.roster;
+        const filtered = this.getFilteredRoster();
+        const pool = filtered.length ? filtered : this.roster;
         const pick = pool[Math.floor(Math.random() * pool.length)];
         if (!pick) return;
         const slot = this.mode === 'ONLINE_PVP' ? (this.onlineRole === 'guest' ? 2 : 1) : this.activeClickTarget;
         this.confirmPickForSlot(slot, pick.id);
       });
-      grid.appendChild(randTile);
+      this._avatarRandTile = randTile;
 
-      list.forEach((f) => {
-        const globalIdx = this.roster.findIndex((r) => r.id === f.id);
-        const uni = (window.ANIME_UNIVERSES || []).find((u) => u.id === f.universe);
+      const frag = document.createDocumentFragment();
+      frag.appendChild(randTile);
+
+      const universes = window.ANIME_UNIVERSES || [];
+      this.roster.forEach((f, globalIdx) => {
+        const uni = universes.find((u) => u.id === f.universe);
         const uniColor = (uni && uni.color) || (f.colors && f.colors.primary) || '#00D2FF';
         const displayName = this.cleanFighterName(f.name);
         const displaySub = this.cleanFighterTitle(f.title || this.cleanUniverseLabel(f.universeLabel || ''));
+        const cleanUniLabel = this.cleanUniverseLabel(f.universeLabel);
         const hasAwaken = Boolean(f.awakenedForm && f.awakenedForm.name);
 
         const tile = document.createElement('button');
@@ -1951,8 +1956,50 @@
           this.confirmPickForSlot(slot, f.id);
         });
 
-        grid.appendChild(tile);
+        const hay = `${displayName} ${this.cleanFighterTitle(f.title)} ${cleanUniLabel} ${f.id}`.toLowerCase();
+        this._avatarTileEntries.push({
+          tile,
+          universe: f.universe,
+          hay
+        });
+        frag.appendChild(tile);
       });
+
+      const empty = document.createElement('div');
+      empty.className = 'avatar-grid-empty hidden';
+      empty.innerHTML = `<span>Không tìm thấy chiến binh phù hợp.</span>`;
+      this._avatarEmptyEl = empty;
+      frag.appendChild(empty);
+
+      grid.appendChild(frag);
+      this._avatarGridBuiltCount = this.roster.length;
+    }
+
+    renderAvatarGrid() {
+      const grid = document.getElementById('selAvatarGrid');
+      if (!grid) return;
+
+      if (this._avatarGridBuiltCount !== this.roster.length || !this._avatarTileEntries.length || !grid.contains(this._avatarTileEntries[0].tile)) {
+        this.buildAvatarGridTiles(grid);
+      }
+
+      const q = (this.searchQuery || '').trim().toLowerCase();
+      const uni = this.selectedUniverse;
+      let visibleCount = 0;
+
+      for (let i = 0; i < this._avatarTileEntries.length; i++) {
+        const entry = this._avatarTileEntries[i];
+        const visible = (uni === 'all' || entry.universe === uni) && (!q || entry.hay.includes(q));
+        entry.tile.classList.toggle('hidden', !visible);
+        if (visible) visibleCount++;
+      }
+
+      if (this._avatarRandTile) {
+        this._avatarRandTile.classList.toggle('hidden', visibleCount === 0);
+      }
+      if (this._avatarEmptyEl) {
+        this._avatarEmptyEl.classList.toggle('hidden', visibleCount > 0);
+      }
 
       this.updateGridCursorClasses();
     }
@@ -2339,6 +2386,18 @@
       this.renderMapThumbnails();
       this.updateMapPreviewMeta();
 
+      // Background preload selected leads + assists so fetch/decode overlaps stage pick
+      if (window.mugenRegistry && typeof window.mugenRegistry.ensureFightersLoaded === 'function') {
+        const p1LeadId = this.p1Team[0];
+        const p2LeadId = this.p2Team[0];
+        if (p1LeadId || p2LeadId) {
+          window.mugenRegistry.ensureFightersLoaded(p1LeadId, p2LeadId);
+        }
+        if (this.p1Assist || this.p2Assist) {
+          window.mugenRegistry.ensureFightersLoaded(this.p1Assist, this.p2Assist);
+        }
+      }
+
       // In Online mode, Guest waits for Host to confirm stage
       const startBtn = document.getElementById('btnStartBattle');
       if (startBtn) {
@@ -2438,10 +2497,15 @@
 
     getMapThumbDataUrl(mapId) {
       if (this.mapThumbCache.has(mapId)) return this.mapThumbCache.get(mapId);
-      const cnv = document.createElement('canvas');
-      cnv.width = 240;
-      cnv.height = 135;
+      if (!this._mapThumbScratchCanvas) {
+        const cnv = document.createElement('canvas');
+        cnv.width = 240;
+        cnv.height = 135;
+        this._mapThumbScratchCanvas = cnv;
+      }
+      const cnv = this._mapThumbScratchCanvas;
       const ctx = cnv.getContext('2d');
+      ctx.clearRect(0, 0, 240, 135);
       if (typeof window.renderArenaMap === 'function') {
         try {
           window.renderArenaMap(ctx, mapId, 240, 135, 114, 40);
@@ -2452,13 +2516,32 @@
       return url;
     }
 
+    cancelMapThumbBatch() {
+      this._mapThumbRenderGen++;
+      if (this._mapThumbBatchHandle !== null) {
+        if (this._mapThumbBatchIsTimeout) {
+          clearTimeout(this._mapThumbBatchHandle);
+        } else if (typeof cancelAnimationFrame === 'function') {
+          cancelAnimationFrame(this._mapThumbBatchHandle);
+        }
+        this._mapThumbBatchHandle = null;
+        this._mapThumbBatchIsTimeout = false;
+      }
+    }
+
     renderMapThumbnails() {
       const grid = document.getElementById('mapThumbGrid');
       if (!grid) return;
+      this.cancelMapThumbBatch();
+      const gen = this._mapThumbRenderGen;
+
       const filtered = this.selectedMapCat === 'all'
         ? this.maps
         : this.maps.filter((m) => m.category === this.selectedMapCat);
       grid.innerHTML = '';
+
+      const frag = document.createDocumentFragment();
+      const pending = [];
 
       filtered.forEach((m) => {
         const card = document.createElement('button');
@@ -2467,14 +2550,60 @@
         card.className = 'map-thumb-card' + (isActive ? ' active' : '');
         card.setAttribute('aria-pressed', String(isActive));
         card.dataset.mapId = m.id;
-        const thumbUrl = this.getMapThumbDataUrl(m.id);
-        card.innerHTML = `
-          <img src="${thumbUrl}" alt="${this.escapeHtml(m.name)}" />
-          <div class="map-thumb-label">${this.escapeHtml(m.name)}</div>
-        `;
+
+        const img = document.createElement('img');
+        img.alt = m.name;
+        if (this.mapThumbCache.has(m.id)) {
+          img.src = this.mapThumbCache.get(m.id);
+        } else {
+          pending.push({ mapId: m.id, img });
+        }
+
+        const label = document.createElement('div');
+        label.className = 'map-thumb-label';
+        label.textContent = m.name;
+
+        card.appendChild(img);
+        card.appendChild(label);
         card.addEventListener('click', () => this.selectMapId(m.id));
-        grid.appendChild(card);
+        frag.appendChild(card);
       });
+
+      grid.appendChild(frag);
+
+      if (!pending.length) return;
+
+      let idx = 0;
+      const scheduleNext = (fn) => {
+        if (!document.hidden && typeof requestAnimationFrame === 'function') {
+          this._mapThumbBatchIsTimeout = false;
+          this._mapThumbBatchHandle = requestAnimationFrame(fn);
+        } else {
+          this._mapThumbBatchIsTimeout = true;
+          this._mapThumbBatchHandle = setTimeout(fn, 0);
+        }
+      };
+
+      const processBatch = () => {
+        if (gen !== this._mapThumbRenderGen) return;
+        this._mapThumbBatchHandle = null;
+        const start = typeof performance !== 'undefined' ? performance.now() : 0;
+        let rendered = 0;
+        while (idx < pending.length && rendered < 4) {
+          if (rendered >= 1 && start && (performance.now() - start) >= 10) break;
+          const item = pending[idx++];
+          const url = this.getMapThumbDataUrl(item.mapId);
+          if (item.img && item.img.isConnected) {
+            item.img.src = url;
+          }
+          rendered++;
+        }
+        if (idx < pending.length) {
+          scheduleNext(processBatch);
+        }
+      };
+
+      scheduleNext(processBatch);
     }
 
     updateMapPreviewMeta() {
@@ -2508,6 +2637,7 @@
     }
 
     stopMapPreviewLoop() {
+      this.cancelMapThumbBatch();
       if (this.mapPreviewAnimId) {
         cancelAnimationFrame(this.mapPreviewAnimId);
         this.mapPreviewAnimId = null;
@@ -2516,108 +2646,148 @@
 
     // ==================== 5. BVN VS SPLASH -> BATTLE LAUNCH ====================
     async startVsSplashAndBattle() {
-      const p1Lead = this.getFighterMeta(this.p1Team[0] || 'naruto');
-      const p2Lead = this.getFighterMeta(this.p2Team[0] || 'luffy');
-      const mapMeta = this.maps.find((m) => m.id === this.selectedMapId) || this.maps[0];
+      if (this._startingBattle) return;
+      this._startingBattle = true;
+      try {
+        const p1Lead = this.getFighterMeta(this.p1Team[0] || 'naruto');
+        const p2Lead = this.getFighterMeta(this.p2Team[0] || 'luffy');
+        const mapMeta = this.maps.find((m) => m.id === this.selectedMapId) || this.maps[0];
 
-      const p1Clean = this.cleanFighterName(p1Lead.name);
-      const p2Clean = this.cleanFighterName(p2Lead.name);
-      const diffMeta = this.getAiDifficultyMeta(this.aiDifficulty);
-      const diffUpper = diffMeta.label.toUpperCase();
+        const p1Clean = this.cleanFighterName(p1Lead.name);
+        const p2Clean = this.cleanFighterName(p2Lead.name);
+        const diffMeta = this.getAiDifficultyMeta(this.aiDifficulty);
+        const diffUpper = diffMeta.label.toUpperCase();
 
-      const vsP1Badge = document.getElementById('vsP1Badge');
-      const vsP2Badge = document.getElementById('vsP2Badge');
-      if (vsP1Badge) {
-        vsP1Badge.textContent = (this.mode === 'ONLINE_PVP' && this.onlineRoom && this.onlineRoom.p1)
-          ? `P1 · ${this.onlineRoom.p1.nickname}`
-          : 'PLAYER 1';
-      }
-      if (vsP2Badge) {
-        if (this.isCpuMode(this.mode)) {
-          vsP2Badge.textContent = `CPU · ${diffUpper}`;
-        } else if (this.mode === 'ONLINE_PVP' && this.onlineRoom && this.onlineRoom.p2) {
-          vsP2Badge.textContent = `P2 · ${this.onlineRoom.p2.nickname}`;
-        } else if (this.mode === 'TRAINING') {
-          vsP2Badge.textContent = 'TRAINING DUMMY';
-        } else {
-          vsP2Badge.textContent = 'PLAYER 2';
+        const vsP1Badge = document.getElementById('vsP1Badge');
+        const vsP2Badge = document.getElementById('vsP2Badge');
+        if (vsP1Badge) {
+          vsP1Badge.textContent = (this.mode === 'ONLINE_PVP' && this.onlineRoom && this.onlineRoom.p1)
+            ? `P1 · ${this.onlineRoom.p1.nickname}`
+            : 'PLAYER 1';
         }
-      }
-
-      document.getElementById('vsP1Img').src = `avatars/${p1Lead.id}_big.png`;
-      document.getElementById('vsP2Img').src = `avatars/${p2Lead.id}_big.png`;
-      document.getElementById('vsP1Name').textContent = p1Clean;
-      document.getElementById('vsP2Name').textContent = p2Clean;
-      document.getElementById('vsStageLabel').textContent = mapMeta ? mapMeta.name : this.selectedMapId;
-      document.getElementById('vsP1TeamRow').innerHTML = [...this.p1Team, this.p1Assist].filter(Boolean).map((id) => `<img src="avatars/${id}.png" alt="${this.escapeHtml(id)}" />`).join('');
-      document.getElementById('vsP2TeamRow').innerHTML = [...this.p2Team, this.p2Assist].filter(Boolean).map((id) => `<img src="avatars/${id}.png" alt="${this.escapeHtml(id)}" />`).join('');
-
-      this.showScreen('screenVsSplash');
-      const loadTxt = document.getElementById('vsLoadStatus');
-      if (loadTxt) loadTxt.textContent = 'Đang chuẩn bị đấu trường...';
-
-      // Preload lead fighters & assists in parallel while VS Splash displays (min 1.15s)
-      const minWait = new Promise((r) => setTimeout(r, 1150));
-      const preload = (async () => {
-        if (window.mugenRegistry) {
-          const unique = Array.from(new Set([p1Lead.id, p2Lead.id, this.p1Assist, this.p2Assist].filter(Boolean)));
-          await Promise.all(unique.map((fid) => window.mugenRegistry.loadPresetForFighter(fid).catch(() => null)));
+        if (vsP2Badge) {
+          if (this.isCpuMode(this.mode)) {
+            vsP2Badge.textContent = `CPU · ${diffUpper}`;
+          } else if (this.mode === 'ONLINE_PVP' && this.onlineRoom && this.onlineRoom.p2) {
+            vsP2Badge.textContent = `P2 · ${this.onlineRoom.p2.nickname}`;
+          } else if (this.mode === 'TRAINING') {
+            vsP2Badge.textContent = 'TRAINING DUMMY';
+          } else {
+            vsP2Badge.textContent = 'PLAYER 2';
+          }
         }
-      })();
-      await Promise.all([minWait, preload]);
 
-      // Enter Battle Screen
-      this.showScreen('screenBattle');
+        document.getElementById('vsP1Img').src = `avatars/${p1Lead.id}_big.png`;
+        document.getElementById('vsP2Img').src = `avatars/${p2Lead.id}_big.png`;
+        document.getElementById('vsP1Name').textContent = p1Clean;
+        document.getElementById('vsP2Name').textContent = p2Clean;
+        document.getElementById('vsStageLabel').textContent = mapMeta ? mapMeta.name : this.selectedMapId;
+        document.getElementById('vsP1TeamRow').innerHTML = [...this.p1Team, this.p1Assist].filter(Boolean).map((id) => `<img src="avatars/${id}.png" alt="${this.escapeHtml(id)}" />`).join('');
+        document.getElementById('vsP2TeamRow').innerHTML = [...this.p2Team, this.p2Assist].filter(Boolean).map((id) => `<img src="avatars/${id}.png" alt="${this.escapeHtml(id)}" />`).join('');
 
-      const modeTag = document.getElementById('battleModeTag');
-      const stageTag = document.getElementById('battleStageTag');
-      const pingTag = document.getElementById('battlePingTag');
-      const emoteBar = document.getElementById('onlineEmoteBar');
-      const p2Deck = document.getElementById('p2DeckContainer');
-      const skillBar = document.getElementById('battleSkillBar');
-      const toggleBtn = document.getElementById('btnToggleSkillBar');
+        this.showScreen('screenVsSplash');
+        const loadTxt = document.getElementById('vsLoadStatus');
+        if (loadTxt) loadTxt.textContent = 'Đang chuẩn bị đấu trường...';
 
-      const battleModeLabels = {
-        TEAM_CPU: `TEAM ${this.format.toUpperCase()} · CPU ${diffUpper}`,
-        SINGLE_CPU: `SINGLE ${this.format.toUpperCase()} · CPU ${diffUpper}`,
-        LOCAL_2P: `2P VERSUS · ${this.format.toUpperCase()}`,
-        ONLINE_PVP: `ONLINE PVP · ${this.format.toUpperCase()}`,
-        TRAINING: `TRAINING · COMBO LAB`
-      };
+        // Preload lead fighters with a bounded timeout so slow/stalled R2 assets never freeze VS Splash;
+        // use a snappy ~300ms transition when leads are already loaded in memory, keeping 1150ms only on cold load.
+        const reg = window.mugenRegistry;
+        const leadIds = Array.from(new Set([p1Lead.id, p2Lead.id].filter(Boolean)));
+        const leadsAlreadyCached = Boolean(
+          reg && reg.loadedPacks && leadIds.every((fid) =>
+            reg.loadedPacks.has(fid) || (typeof reg.getPreset === 'function' && !reg.getPreset(fid))
+          )
+        );
+        const minWait = new Promise((r) => setTimeout(r, leadsAlreadyCached ? 300 : 1150));
+        const preload = (async () => {
+          if (!reg) return;
+          const assistIds = [this.p1Assist, this.p2Assist].filter((id) => id && !leadIds.includes(id));
+          if (assistIds.length) {
+            reg.ensureFightersLoaded(assistIds[0], assistIds[1]);
+          }
+          let doneCount = 0;
+          const total = leadIds.length;
+          if (total > 0 && loadTxt) {
+            loadTxt.textContent = leadsAlreadyCached
+              ? 'Đấu trường sẵn sàng!'
+              : `Đang tải chiến binh (0/${total})...`;
+          }
+          const loadLeads = Promise.all(
+            leadIds.map((fid) =>
+              reg.loadPresetForFighter(fid)
+                .catch(() => null)
+                .finally(() => {
+                  doneCount++;
+                  if (loadTxt && this.currentScreen === 'screenVsSplash') {
+                    loadTxt.textContent = doneCount >= total
+                      ? 'Đấu trường sẵn sàng!'
+                      : `Đang tải chiến binh (${doneCount}/${total})...`;
+                  }
+                })
+            )
+          );
+          const maxSplashWait = new Promise((resolve) => setTimeout(resolve, 6500));
+          await Promise.race([loadLeads, maxSplashWait]);
+        })();
+        await Promise.all([minWait, preload]);
 
-      const isSingleDeck = this.mode !== 'LOCAL_2P';
-      if (modeTag) modeTag.textContent = battleModeLabels[this.mode] || `${this.mode.replace('_', ' ')} · ${this.format.toUpperCase()}`;
-      if (stageTag) stageTag.textContent = mapMeta ? mapMeta.name : this.selectedMapId;
-      if (pingTag) pingTag.classList.toggle('hidden', this.mode !== 'ONLINE_PVP');
-      if (emoteBar) emoteBar.classList.toggle('hidden', this.mode !== 'ONLINE_PVP');
-      if (p2Deck) p2Deck.classList.toggle('hidden', isSingleDeck);
-      if (skillBar) {
-        skillBar.classList.toggle('single-deck', isSingleDeck);
-        skillBar.classList.toggle('hidden', this.skillBarCollapsed);
-      }
-      if (toggleBtn) {
-        toggleBtn.setAttribute('aria-expanded', String(!this.skillBarCollapsed));
-        toggleBtn.classList.toggle('is-collapsed', this.skillBarCollapsed);
-      }
-      document.getElementById('screenBattle')?.classList.toggle('skillbar-collapsed', this.skillBarCollapsed);
+        if (this.currentScreen !== 'screenVsSplash') return;
 
-      if (window.gameApp) {
-        if (this.isCpuMode(this.mode) && typeof window.gameApp.setAiDifficulty === 'function') {
-          window.gameApp.setAiDifficulty(this.aiDifficulty);
+        // Enter Battle Screen
+        this.showScreen('screenBattle');
+
+        const modeTag = document.getElementById('battleModeTag');
+        const stageTag = document.getElementById('battleStageTag');
+        const pingTag = document.getElementById('battlePingTag');
+        const emoteBar = document.getElementById('onlineEmoteBar');
+        const p2Deck = document.getElementById('p2DeckContainer');
+        const skillBar = document.getElementById('battleSkillBar');
+        const toggleBtn = document.getElementById('btnToggleSkillBar');
+
+        const battleModeLabels = {
+          TEAM_CPU: `TEAM ${this.format.toUpperCase()} · CPU ${diffUpper}`,
+          SINGLE_CPU: `SINGLE ${this.format.toUpperCase()} · CPU ${diffUpper}`,
+          LOCAL_2P: `2P VERSUS · ${this.format.toUpperCase()}`,
+          ONLINE_PVP: `ONLINE PVP · ${this.format.toUpperCase()}`,
+          TRAINING: `TRAINING · COMBO LAB`
+        };
+
+        const isSingleDeck = this.mode !== 'LOCAL_2P';
+        if (modeTag) modeTag.textContent = battleModeLabels[this.mode] || `${this.mode.replace('_', ' ')} · ${this.format.toUpperCase()}`;
+        if (stageTag) stageTag.textContent = mapMeta ? mapMeta.name : this.selectedMapId;
+        if (pingTag) pingTag.classList.toggle('hidden', this.mode !== 'ONLINE_PVP');
+        if (emoteBar) emoteBar.classList.toggle('hidden', this.mode !== 'ONLINE_PVP');
+        if (p2Deck) p2Deck.classList.toggle('hidden', isSingleDeck);
+        if (skillBar) {
+          skillBar.classList.toggle('single-deck', isSingleDeck);
+          skillBar.classList.toggle('hidden', this.skillBarCollapsed);
         }
-        window.gameApp.launchMatch({
-          mode: this.mode,
-          format: this.format,
-          aiDifficulty: this.aiDifficulty,
-          onlineRole: this.onlineRole,
-          p1Team: this.p1Team,
-          p2Team: this.p2Team,
-          p1Assist: this.p1Assist,
-          p2Assist: this.p2Assist,
-          mapId: this.selectedMapId,
-          p1Profile: this.onlineRoom ? this.onlineRoom.p1 : window.gameApp.accounts.state.p1,
-          p2Profile: this.onlineRoom ? this.onlineRoom.p2 : (this.mode === 'LOCAL_2P' ? window.gameApp.accounts.state.p2 : null)
-        });
+        if (toggleBtn) {
+          toggleBtn.setAttribute('aria-expanded', String(!this.skillBarCollapsed));
+          toggleBtn.classList.toggle('is-collapsed', this.skillBarCollapsed);
+        }
+        document.getElementById('screenBattle')?.classList.toggle('skillbar-collapsed', this.skillBarCollapsed);
+
+        if (window.gameApp) {
+          if (this.isCpuMode(this.mode) && typeof window.gameApp.setAiDifficulty === 'function') {
+            window.gameApp.setAiDifficulty(this.aiDifficulty);
+          }
+          window.gameApp.launchMatch({
+            mode: this.mode,
+            format: this.format,
+            aiDifficulty: this.aiDifficulty,
+            onlineRole: this.onlineRole,
+            p1Team: this.p1Team,
+            p2Team: this.p2Team,
+            p1Assist: this.p1Assist,
+            p2Assist: this.p2Assist,
+            mapId: this.selectedMapId,
+            p1Profile: this.onlineRoom ? this.onlineRoom.p1 : window.gameApp.accounts.state.p1,
+            p2Profile: this.onlineRoom ? this.onlineRoom.p2 : (this.mode === 'LOCAL_2P' ? window.gameApp.accounts.state.p2 : null)
+          });
+        }
+      } finally {
+        this._startingBattle = false;
       }
     }
 

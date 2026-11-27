@@ -922,8 +922,8 @@
         ? window.GAME_MAPS[0].id
         : 'konoha_village';
 
+      this._rafId = null;
       this.bindCoreUI();
-      this.loop();
     }
 
     getFighterMeta(id) {
@@ -1069,13 +1069,18 @@
       this.paused = false;
       this.inBattle = true;
 
-      // Preload avatar images for HUD & all team/assist members
-      [...this.p1TeamIds, ...this.p2TeamIds, this.p1AssistId, this.p2AssistId].forEach((fid) => {
+      // Preload avatar images only for active leads + assists up front; 3v3 reserves lazy-load when entering round
+      [this.p1TeamIds[0], this.p2TeamIds[0]].forEach((fid) => {
+        if (!fid) return;
         getCachedAvatarImage(fid, false);
         getCachedAvatarImage(fid, true);
       });
+      [this.p1AssistId, this.p2AssistId].forEach((fid) => {
+        if (fid) getCachedAvatarImage(fid, false);
+      });
 
       this.setupRound(null);
+      this.startLoop();
     }
 
     resetFullMatch() {
@@ -1098,6 +1103,7 @@
     stopBattle() {
       this.inBattle = false;
       this.paused = false;
+      this.stopLoop();
       this.projectiles = [];
       this.beams = [];
       this.assistSummons = [];
@@ -1116,6 +1122,13 @@
     setupRound(carryOver) {
       this.p1Id = this.p1TeamIds[Math.min(this.p1TeamIdx, this.p1TeamIds.length - 1)];
       this.p2Id = this.p2TeamIds[Math.min(this.p2TeamIdx, this.p2TeamIds.length - 1)];
+
+      // Lazy-preload avatar images for the round's active fighters (including 3v3 reserves on entry)
+      [this.p1Id, this.p2Id].forEach((fid) => {
+        if (!fid) return;
+        getCachedAvatarImage(fid, false);
+        getCachedAvatarImage(fid, true);
+      });
 
       const m1 = this.getFighterMeta(this.p1Id);
       const m2 = this.getFighterMeta(this.p2Id);
@@ -1171,11 +1184,14 @@
         this.launchMatch(config);
         return;
       }
+      this.inBattle = true;
+      this.paused = false;
       this.p1TeamIds = [this.p1Id];
       this.p2TeamIds = [this.p2Id];
       this.p1TeamIdx = 0;
       this.p2TeamIdx = 0;
       this.setupRound(null);
+      this.startLoop();
     }
 
     // ==================== 8. SKILL & ASSIST EXECUTION ====================
@@ -4957,10 +4973,26 @@
       updatePills(this.p2, 'p2SkillPills');
     }
 
+    startLoop() {
+      if (this._rafId !== null || !this.inBattle) return;
+      this._rafId = requestAnimationFrame(() => this.loop());
+    }
+
+    stopLoop() {
+      if (this._rafId !== null) {
+        cancelAnimationFrame(this._rafId);
+        this._rafId = null;
+      }
+    }
+
     loop() {
+      this._rafId = null;
+      if (!this.inBattle) return;
       this.update();
       this.draw();
-      requestAnimationFrame(() => this.loop());
+      if (this.inBattle) {
+        this._rafId = requestAnimationFrame(() => this.loop());
+      }
     }
   }
 

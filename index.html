@@ -6,7 +6,8 @@
   <title>BVN: ANIME MULTIVERSE — Đấu Trường Đối Kháng Crossover &amp; Online PvP</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,800;1,900&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,800;1,900&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,700;0,800;0,900;1,800;1,900&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet" /></noscript>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -648,7 +649,7 @@
   <!-- ==================== SCREEN 5: BVN VS LOADING SPLASH ==================== -->
   <section id="screenVsSplash" class="bvn-screen vs-splash-screen">
     <div class="vs-half p1-half">
-      <img id="vsP1Img" class="vs-big-portrait" src="avatars/naruto_big.png" alt="P1" />
+      <img id="vsP1Img" class="vs-big-portrait" alt="P1" />
       <div class="vs-info">
         <span id="vsP1Badge" class="side-badge p1">PLAYER 1</span>
         <h2 id="vsP1Name">Uzumaki Naruto</h2>
@@ -663,7 +664,7 @@
     </div>
 
     <div class="vs-half p2-half">
-      <img id="vsP2Img" class="vs-big-portrait mirror-x" src="avatars/luffy_big.png" alt="P2" />
+      <img id="vsP2Img" class="vs-big-portrait mirror-x" alt="P2" />
       <div class="vs-info">
         <span id="vsP2Badge" class="side-badge p2">PLAYER 2</span>
         <h2 id="vsP2Name">Monkey D. Luffy</h2>
@@ -875,7 +876,7 @@
       </div>
       <div class="victory-body">
         <div class="victory-portrait-box">
-          <img id="victoryPortrait" src="avatars/naruto_big.png" alt="Winner" />
+          <img id="victoryPortrait" alt="Winner" />
         </div>
         <div class="victory-details">
           <h3 id="victoryFighterName">Uzumaki Naruto</h3>
@@ -919,14 +920,14 @@
   </div>
 
   <!-- SCRIPTS (ORDERED DEPENDENCIES) -->
-  <script src="config.js"></script>
-  <script src="roster.js"></script>
-  <script src="roster-extra.js"></script>
-  <script src="mugen-presets-extra.js"></script>
-  <script src="maps.js"></script>
-  <script src="mugen-loader.js"></script>
-  <script src="netplay.js"></script>
-  <script src="engine.js"></script>
-  <script src="bvn-ui.js"></script>
+  <script defer src="config.js"></script>
+  <script defer src="roster.js"></script>
+  <script defer src="roster-extra.js"></script>
+  <script defer src="mugen-presets-extra.js"></script>
+  <script defer src="maps.js"></script>
+  <script defer src="mugen-loader.js"></script>
+  <script defer src="netplay.js"></script>
+  <script defer src="engine.js"></script>
+  <script defer src="bvn-ui.js"></script>
 </body>
 </html>

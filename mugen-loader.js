@@ -37,6 +37,134 @@
     return `${base}/${encodedRel}`;
   }
 
+  // ==================== PERSISTENT BROWSER ASSET CACHE (Cache API + IndexedDB Fallback) ====================
+  const ASSET_CACHE_NAME = 'bvn-mugen-assets-v1';
+  const ASSET_CACHE_VERSION = '1';
+  const ASSET_IDB_NAME = 'bvn-mugen-assets-idb';
+  const ASSET_IDB_STORE = 'assets';
+  let _cachePromise = null;
+  let _idbPromise = null;
+
+  function buildAssetCacheKey(resolvedUrl) {
+    if (!resolvedUrl) return null;
+    try {
+      const baseHref = (typeof window !== 'undefined' && window.location && window.location.href)
+        ? window.location.href
+        : 'http://localhost/';
+      const u = new URL(resolvedUrl, baseHref);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+      u.searchParams.set('__bvn_cv', ASSET_CACHE_VERSION);
+      return u.href;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function openAssetCache() {
+    if (typeof caches === 'undefined' || typeof window === 'undefined') return Promise.resolve(null);
+    if (!_cachePromise) {
+      _cachePromise = caches.open(ASSET_CACHE_NAME).catch(() => null);
+    }
+    return _cachePromise;
+  }
+
+  function openAssetIDB() {
+    if (typeof indexedDB === 'undefined') return Promise.resolve(null);
+    if (!_idbPromise) {
+      _idbPromise = new Promise((resolve) => {
+        try {
+          const req = indexedDB.open(ASSET_IDB_NAME, 1);
+          req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(ASSET_IDB_STORE)) {
+              db.createObjectStore(ASSET_IDB_STORE);
+            }
+          };
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => resolve(null);
+        } catch (_) {
+          resolve(null);
+        }
+      });
+    }
+    return _idbPromise;
+  }
+
+  async function idbGetAsset(key) {
+    const db = await openAssetIDB();
+    if (!db) return null;
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(ASSET_IDB_STORE, 'readonly');
+        const req = tx.objectStore(ASSET_IDB_STORE).get(key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+      } catch (_) {
+        resolve(null);
+      }
+    });
+  }
+
+  async function idbPutAsset(key, value) {
+    const db = await openAssetIDB();
+    if (!db) return;
+    try {
+      const tx = db.transaction(ASSET_IDB_STORE, 'readwrite');
+      tx.objectStore(ASSET_IDB_STORE).put(value, key);
+    } catch (_) {
+      // Ignore quota / private mode failures
+    }
+  }
+
+  async function fetchAssetWithCache(relUrl, asText, signal, hasRemoteBase) {
+    const url = resolveAssetUrl(relUrl);
+    const cacheKey = buildAssetCacheKey(url);
+
+    // 1. Try Cache API first (streams 10-102 MB files directly without structured-clone copy)
+    if (cacheKey) {
+      const cache = await openAssetCache();
+      if (cache) {
+        try {
+          const cached = await cache.match(cacheKey);
+          if (cached && cached.ok) {
+            return asText ? await cached.text() : await cached.arrayBuffer();
+          }
+        } catch (_) {}
+      } else {
+        // Fallback: IndexedDB when Cache API is unavailable (e.g. non-localhost HTTP)
+        const idbHit = await idbGetAsset(cacheKey);
+        if (idbHit !== null) return idbHit;
+      }
+    }
+
+    // 2. Network fetch
+    const opts = hasRemoteBase ? { mode: 'cors' } : {};
+    if (signal) opts.signal = signal;
+    const resp = await fetch(url, opts);
+    if (!resp.ok) return null;
+
+    let cacheClone = null;
+    const canPersist = Boolean(cacheKey && resp.status === 200 && resp.type !== 'opaque');
+    const cache = canPersist ? await openAssetCache() : null;
+    if (canPersist && cache && typeof resp.clone === 'function') {
+      try {
+        cacheClone = resp.clone();
+      } catch (_) {}
+    }
+
+    const payload = asText ? await resp.text() : await resp.arrayBuffer();
+
+    if (canPersist) {
+      if (cache && cacheClone) {
+        cache.put(cacheKey, cacheClone).catch(() => {});
+      } else if (!cache) {
+        idbPutAsset(cacheKey, payload).catch(() => {});
+      }
+    }
+
+    return payload;
+  }
+
   // ==================== PNG CRC32 & CHUNK PATCHER (SFF v2.1 PNG8 PLTE + tRNS) ====================
   const CRC32_TABLE = (function () {
     const t = new Uint32Array(256);
@@ -150,18 +278,52 @@
   }
 
   // ==================== PALETTE & .ACT HELPERS ====================
+  const IS_LITTLE_ENDIAN = (function () {
+    const b = new ArrayBuffer(4);
+    new Uint32Array(b)[0] = 0x0a0b0c0d;
+    return new Uint8Array(b)[0] === 0x0d;
+  })();
+
+  const DEFAULT_WHITE_PALETTE = (function () {
+    const pal = new Array(256);
+    pal[0] = [0, 0, 0, 255];
+    for (let i = 1; i < 256; i++) pal[i] = [255, 255, 255, 255];
+    return pal;
+  })();
+
+  function getPackedPalette(palette) {
+    if (palette && palette._abgr32) return palette._abgr32;
+    const u32 = new Uint32Array(256);
+    u32[0] = 0; // Color index 0 is always transparent in M.U.G.E.N
+    if (!palette) {
+      for (let i = 1; i < 256; i++) u32[i] = 0xffffffff;
+      return u32;
+    }
+    for (let i = 1; i < 256; i++) {
+      const c = palette[i];
+      if (!c) {
+        u32[i] = 0xffffffff;
+      } else {
+        const a = c[3] !== undefined ? c[3] : 255;
+        u32[i] = (((a & 0xff) << 24) | ((c[2] & 0xff) << 16) | ((c[1] & 0xff) << 8) | (c[0] & 0xff)) >>> 0;
+      }
+    }
+    palette._abgr32 = u32;
+    return u32;
+  }
+
   function decodeActBuffer(buffer, reverseOrder) {
-    const dv = new DataView(buffer);
+    const u8 = new Uint8Array(buffer);
     const palette = new Array(256);
     let offset = 0;
     for (let i = 0; i < 256; i++) {
-      if (offset + 2 >= dv.byteLength) {
+      if (offset + 2 >= u8.length) {
         palette[i] = [0, 0, 0];
         continue;
       }
-      const r = dv.getUint8(offset++);
-      const g = dv.getUint8(offset++);
-      const b = dv.getUint8(offset++);
+      const r = u8[offset++];
+      const g = u8[offset++];
+      const b = u8[offset++];
       if (reverseOrder) {
         palette[255 - i] = [r, g, b];
       } else {
@@ -171,19 +333,14 @@
     return palette;
   }
 
-  function extractPcxEmbeddedPalette(buffer) {
-    if (!buffer || buffer.byteLength < 769) return null;
-    const dv = new DataView(buffer);
-    const palMarkerOffset = buffer.byteLength - 769;
-    if (dv.getUint8(palMarkerOffset) !== 12) return null;
+  function extractPcxEmbeddedPaletteBytes(bytes) {
+    if (!bytes || bytes.byteLength < 769) return null;
+    const palMarkerOffset = bytes.byteLength - 769;
+    if (bytes[palMarkerOffset] !== 12) return null;
     const palette = new Array(256);
     let pOff = palMarkerOffset + 1;
     for (let c = 0; c < 256; c++) {
-      palette[c] = [
-        dv.getUint8(pOff),
-        dv.getUint8(pOff + 1),
-        dv.getUint8(pOff + 2)
-      ];
+      palette[c] = [bytes[pOff], bytes[pOff + 1], bytes[pOff + 2], 255];
       pOff += 3;
     }
     return palette;
@@ -202,83 +359,105 @@
     return matches;
   }
 
+  function computeIndexedBounds(indexed, width, height) {
+    let minX = width;
+    let maxX = -1;
+    let minY = height;
+    let maxY = -1;
+    let opaqueCount = 0;
+    const len = indexed.length;
+    for (let y = 0; y < height; y++) {
+      const rowOff = y * width;
+      if (rowOff >= len) break;
+      const rowEnd = Math.min(width, len - rowOff);
+      for (let x = 0; x < rowEnd; x++) {
+        if (indexed[rowOff + x] !== 0) {
+          opaqueCount++;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    return opaqueCount > 0
+      ? { minX, maxX, minY, maxY, visW: maxX - minX + 1, visH: maxY - minY + 1, opaqueCount }
+      : { minX: 0, maxX: 0, minY: 0, maxY: 0, visW: 0, visH: 0, opaqueCount: 0 };
+  }
+
   // ==================== SFF v1 (PCX 8-bit RLE) DECODER ====================
-  function decodePcxToCanvas(buffer, sharedPalette, fallbackPalette) {
-    if (!buffer || buffer.byteLength < 128) return null;
-    const dv = new DataView(buffer);
+  function decodePcxToIndexed(bytes, hasEmbeddedPalette) {
+    if (!bytes || bytes.byteLength < 128) return null;
+    if (bytes[0] !== 0x0a || bytes[3] !== 8) return null;
 
-    const manufacturer = dv.getUint8(0);
-    if (manufacturer !== 0x0a) return null;
-
-    const encoding = dv.getUint8(2);
-    const bpp = dv.getUint8(3);
-    if (bpp !== 8) return null;
-
-    const xmin = dv.getUint16(4, true);
-    const ymin = dv.getUint16(6, true);
-    const xmax = dv.getUint16(8, true);
-    const ymax = dv.getUint16(10, true);
-    const bpl = dv.getUint16(66, true);
+    const encoding = bytes[2];
+    const xmin = bytes[4] | (bytes[5] << 8);
+    const ymin = bytes[6] | (bytes[7] << 8);
+    const xmax = bytes[8] | (bytes[9] << 8);
+    const ymax = bytes[10] | (bytes[11] << 8);
+    const bpl = bytes[66] | (bytes[67] << 8);
 
     const width = xmax - xmin + 1;
     const height = ymax - ymin + 1;
     if (width <= 0 || height <= 0 || width > 2048 || height > 2048) return null;
 
-    let embeddedPalette = null;
-    if (!sharedPalette) {
-      embeddedPalette = extractPcxEmbeddedPalette(buffer);
-    }
-    const palette = sharedPalette || embeddedPalette || fallbackPalette || new Array(256).fill([255, 255, 255]);
-
-    const rgba = new Uint8ClampedArray(width * height * 4);
+    const indexed = new Uint8Array(width * height);
     let offset = 128;
-    // Only exclude trailing 769 bytes when we actually parsed an embedded palette (prevents truncating shared-pal PCX data)
-    const maxDataOffset = embeddedPalette ? (buffer.byteLength - 769) : buffer.byteLength;
-
+    const maxDataOffset = hasEmbeddedPalette ? (bytes.byteLength - 769) : bytes.byteLength;
     const stride = bpl > 0 ? bpl : width;
     let x = 0;
     let y = 0;
 
+    let minX = width;
+    let maxX = -1;
+    let minY = height;
+    let maxY = -1;
+    let opaqueCount = 0;
+
     while (y < height && offset < maxDataOffset) {
-      const byte = dv.getUint8(offset++);
+      const byte = bytes[offset++];
       let runCount = 1;
       let colorIndex = byte;
 
       if (encoding === 1 && (byte & 0xc0) === 0xc0) {
         runCount = byte & 0x3f;
         if (offset >= maxDataOffset) break;
-        colorIndex = dv.getUint8(offset++);
+        colorIndex = bytes[offset++];
       }
 
-      for (let r = 0; r < runCount; r++) {
-        if (x < width && y < height) {
-          const pixIdx = (y * width + x) * 4;
-          if (colorIndex === 0) {
-            rgba[pixIdx + 3] = 0;
-          } else {
-            const rgb = palette[colorIndex] || [255, 255, 255];
-            rgba[pixIdx] = rgb[0];
-            rgba[pixIdx + 1] = rgb[1];
-            rgba[pixIdx + 2] = rgb[2];
-            rgba[pixIdx + 3] = 255;
-          }
-        }
-        x++;
-        if (x >= stride) {
-          x = 0;
+      if (colorIndex === 0) {
+        // Fast skip for transparent runs without per-pixel writes
+        x += runCount;
+        while (x >= stride) {
+          x -= stride;
           y++;
           if (y >= height) break;
+        }
+      } else {
+        for (let r = 0; r < runCount; r++) {
+          if (x < width && y < height) {
+            indexed[y * width + x] = colorIndex;
+            opaqueCount++;
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+          x++;
+          if (x >= stride) {
+            x = 0;
+            y++;
+            if (y >= height) break;
+          }
         }
       }
     }
 
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    ctx.putImageData(new ImageData(rgba, width, height), 0, 0);
+    const bounds = opaqueCount > 0
+      ? { minX, maxX, minY, maxY, visW: maxX - minX + 1, visH: maxY - minY + 1, opaqueCount }
+      : { minX: 0, maxX: 0, minY: 0, maxY: 0, visW: 0, visH: 0, opaqueCount: 0 };
 
-    return { canvas, width, height, palette };
+    return { indexed, width, height, bounds };
   }
 
   // ==================== SFF v2 (M.U.G.E.N 1.0 / 1.1 JUS) CODECS ====================
@@ -287,13 +466,18 @@
     const out = new Uint8Array(dstLen);
     let s = 0;
     let d = 0;
-    while (s < src.length && d < dstLen) {
+    const srcLen = src.length;
+    while (s < srcLen && d < dstLen) {
       const ch = src[s++];
       if ((ch & 0xc0) === 0x40) {
         const run = ch & 0x3f;
-        const val = s < src.length ? src[s++] : 0;
-        for (let i = 0; i < run && d < dstLen; i++) {
-          out[d++] = val;
+        const val = s < srcLen ? src[s++] : 0;
+        if (val === 0) {
+          d = Math.min(dstLen, d + run);
+        } else {
+          const end = Math.min(dstLen, d + run);
+          out.fill(val, d, end);
+          d = end;
         }
       } else {
         out[d++] = ch;
@@ -400,27 +584,37 @@
     return out;
   }
 
-  function indexedToCanvas(indexedBytes, width, height, palette) {
-    const rgba = new Uint8ClampedArray(width * height * 4);
+  function indexedToCanvas(indexedBytes, width, height, palette, precomputedBounds) {
     const total = width * height;
-    for (let i = 0; i < total; i++) {
-      const idx = indexedBytes[i] || 0;
-      const p = i * 4;
-      if (idx === 0) {
-        rgba[p + 3] = 0;
-      } else {
-        const c = (palette && palette[idx]) || [255, 255, 255, 255];
-        rgba[p] = c[0];
-        rgba[p + 1] = c[1];
-        rgba[p + 2] = c[2];
-        rgba[p + 3] = c[3] !== undefined ? c[3] : 255;
+    const rgba = new Uint8ClampedArray(total * 4);
+    const len = Math.min(total, indexedBytes.length);
+
+    if (IS_LITTLE_ENDIAN) {
+      const u32Out = new Uint32Array(rgba.buffer);
+      const pal32 = getPackedPalette(palette);
+      for (let i = 0; i < len; i++) {
+        u32Out[i] = pal32[indexedBytes[i]];
+      }
+    } else {
+      for (let i = 0; i < len; i++) {
+        const idx = indexedBytes[i];
+        if (idx !== 0) {
+          const c = (palette && palette[idx]) || [255, 255, 255, 255];
+          const p = i * 4;
+          rgba[p] = c[0];
+          rgba[p + 1] = c[1];
+          rgba[p + 2] = c[2];
+          rgba[p + 3] = c[3] !== undefined ? c[3] : 255;
+        }
       }
     }
+
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
     canvas.getContext('2d').putImageData(new ImageData(rgba, width, height), 0, 0);
-    return { canvas, width, height };
+    const bounds = precomputedBounds || computeIndexedBounds(indexedBytes, width, height);
+    return { canvas, width, height, _bounds: bounds };
   }
 
   async function decodePngBytesToCanvas(pngBytes) {
@@ -428,19 +622,219 @@
     try {
       const blob = new Blob([pngBytes], { type: 'image/png' });
       const bmp = await createImageBitmap(blob);
-      const c = document.createElement('canvas');
-      c.width = bmp.width;
-      c.height = bmp.height;
-      c.getContext('2d').drawImage(bmp, 0, 0);
-      if (typeof bmp.close === 'function') bmp.close();
-      return { canvas: c, width: c.width, height: c.height };
+      // Keep ImageBitmap directly as canvas drawable (zero extra <canvas> allocation & copy)
+      return { canvas: bmp, width: bmp.width, height: bmp.height, _isBitmap: true };
     } catch (_) {
       return null;
     }
   }
 
-  async function decodeSFFv2(arrayBuffer) {
+  // Decode raw indexed bytes for an SFF v2 indexed entry (fmt 0/2/3/4) without creating a canvas
+  function decodeSff2EntryIndexed(entry) {
+    if (entry._rawIndexed) return entry._rawIndexed;
+    const sff = entry._sffRef;
+    if (!sff || !sff._u8) return null;
+    const u8 = sff._u8;
+    const absOff = entry.absOff;
+    const dataLen = entry.dataLen;
+    const total = entry.width * entry.height;
+    let pix = null;
+    if (entry.fmt === 0) {
+      pix = u8.subarray(absOff, absOff + Math.min(dataLen, total));
+    } else if (entry.fmt === 2 && dataLen > 4) {
+      pix = decodeRle8(u8.subarray(absOff + 4, absOff + dataLen), total);
+    } else if (entry.fmt === 3 && dataLen > 4) {
+      pix = decodeRle5(u8.subarray(absOff + 4, absOff + dataLen), total);
+    } else if (entry.fmt === 4 && dataLen > 4) {
+      pix = decodeLz5(u8.subarray(absOff + 4, absOff + dataLen), total);
+    }
+    if (pix) {
+      entry._rawIndexed = pix;
+      if (!entry._bounds) {
+        entry._bounds = computeIndexedBounds(pix, entry.width, entry.height);
+      }
+    }
+    return pix;
+  }
+
+  function decodeSff1EntryIndexed(entry) {
+    if (entry._rawIndexed) return entry._rawIndexed;
+    const sff = entry._sffRef;
+    if (!sff || !sff._u8) return null;
+    const bytes = sff._u8.subarray(entry._dataStart, entry._dataEnd);
+    const res = decodePcxToIndexed(bytes, entry._hasEmbeddedPal);
+    if (!res) return null;
+    entry._rawIndexed = res.indexed;
+    entry._bounds = res.bounds;
+    return res.indexed;
+  }
+
+  // Synchronously compute bounds from raw indexed bytes / PCX stream before canvas upload
+  function ensureSpriteBounds(entry) {
+    if (!entry) return null;
+    if (entry._bounds) return entry._bounds;
+    if (entry.decoded) {
+      entry._bounds = getSpriteBounds(entry.decoded);
+      return entry._bounds;
+    }
+
+    const target = entry._linkTarget || entry;
+    if (target._bounds) {
+      entry._bounds = target._bounds;
+      return entry._bounds;
+    }
+    if (target.decoded) {
+      target._bounds = getSpriteBounds(target.decoded);
+      entry._bounds = target._bounds;
+      return entry._bounds;
+    }
+
+    if (target._isV1) {
+      decodeSff1EntryIndexed(target);
+    } else if (target._isV2 && target.fmt <= 4) {
+      decodeSff2EntryIndexed(target);
+    }
+    if (target._bounds) {
+      entry._bounds = target._bounds;
+      return entry._bounds;
+    }
+    return null;
+  }
+
+  // Decode PNG entry on demand (returns Promise resolving to decoded object or null)
+  function ensureSpriteDecodedAsync(entry) {
+    if (!entry) return Promise.resolve(null);
+    if (entry.decoded && entry.decoded.canvas) return Promise.resolve(entry.decoded);
+    if (entry._decodePromise) return entry._decodePromise;
+
+    const target = entry._linkTarget || entry;
+    if (target !== entry && entry._shareTargetDecoded) {
+      const p = ensureSpriteDecodedAsync(target).then((dec) => {
+        if (dec) {
+          entry.decoded = dec;
+          if (dec._bounds) entry._bounds = dec._bounds;
+        }
+        return dec;
+      });
+      entry._decodePromise = p;
+      return p;
+    }
+
+    // Synchronous path for indexed entries
+    if (target._isV1 || (target._isV2 && target.fmt <= 4)) {
+      return Promise.resolve(ensureSpriteDecoded(entry));
+    }
+
+    // SFF v2 PNG path (fmt 10/11/12)
+    if (target._isV2 && (target.fmt === 10 || target.fmt === 11 || target.fmt === 12)) {
+      const sff = target._sffRef;
+      if (!sff || !sff._u8) return Promise.resolve(null);
+      let pngRaw = target._rawPngBytes;
+      if (!pngRaw) {
+        const dv = sff._dv;
+        const absOff = target.absOff;
+        const dataLen = target.dataLen;
+        let pngStart = absOff;
+        if (dataLen >= 12 && dv.getUint8(absOff) !== 0x89 && dv.getUint8(absOff + 4) === 0x89) {
+          pngStart = absOff + 4;
+        }
+        pngRaw = sff._u8.subarray(pngStart, absOff + dataLen);
+        if (target._isLinkSource && target.fmt === 10) {
+          target._rawPngBytes = pngRaw;
+        }
+      }
+      const pal = entry._palette || target._palette;
+      const pngBytes = target.fmt === 10 ? patchPng8PaletteAndAlpha(pngRaw, pal) : pngRaw;
+      const p = decodePngBytesToCanvas(pngBytes).then((dec) => {
+        entry._decodePromise = null;
+        if (dec) {
+          entry.decoded = dec;
+          if (entry._bounds) dec._bounds = entry._bounds;
+        }
+        return dec;
+      });
+      entry._decodePromise = p;
+      return p;
+    }
+
+    return Promise.resolve(null);
+  }
+
+  // On-demand sprite decoder: synchronous for PCX / Raw / RLE8 / RLE5 / LZ5; triggers async for PNG
+  function ensureSpriteDecoded(entry) {
+    if (!entry) return null;
+    if (entry.decoded && entry.decoded.canvas) return entry.decoded;
+
+    const target = entry._linkTarget || entry;
+    if (target !== entry && entry._shareTargetDecoded) {
+      const targetDec = ensureSpriteDecoded(target);
+      if (targetDec) {
+        entry.decoded = targetDec;
+        if (targetDec._bounds) entry._bounds = targetDec._bounds;
+        return entry.decoded;
+      }
+      return null;
+    }
+
+    if (target._isV1) {
+      const pix = decodeSff1EntryIndexed(target);
+      if (!pix) return null;
+      const dec = indexedToCanvas(pix, target.width, target.height, entry._palette || target._palette, target._bounds);
+      entry.decoded = dec;
+      entry._bounds = dec._bounds;
+      if (!target._isLinkSource) target._rawIndexed = null;
+      return dec;
+    }
+
+    if (target._isV2 && target.fmt <= 4) {
+      const pix = decodeSff2EntryIndexed(target);
+      if (!pix) return null;
+      const dec = indexedToCanvas(pix, target.width, target.height, entry._palette || target._palette, target._bounds);
+      entry.decoded = dec;
+      entry._bounds = dec._bounds;
+      if (!target._isLinkSource) target._rawIndexed = null;
+      return dec;
+    }
+
+    if (target._isV2 && (target.fmt === 10 || target.fmt === 11 || target.fmt === 12)) {
+      if (!entry._decodePromise) {
+        ensureSpriteDecodedAsync(entry);
+      }
+      return null;
+    }
+
+    return null;
+  }
+
+  function collectCandidatePngKeys(airMap, spriteMap) {
+    const keys = new Set(['9000,0', '9000,1', '9000,9']);
+    if (!airMap) return keys;
+    airMap.forEach((act) => {
+      if (!act || !act.elements) return;
+      let addedNonAdd = false;
+      let addedFallback = false;
+      for (let i = 0; i < act.elements.length; i++) {
+        const el = act.elements[i];
+        if (!el || el.groupNo < 0 || el.imageNo < 0 || el.groupNo >= 9000) continue;
+        const k = `${el.groupNo},${el.imageNo}`;
+        if (!spriteMap.has(k)) continue;
+        if (!addedFallback) {
+          keys.add(k);
+          addedFallback = true;
+        }
+        if (!addedNonAdd && !(el.trans && el.trans.charAt(0) === 'A')) {
+          keys.add(k);
+          addedNonAdd = true;
+          break;
+        }
+      }
+    });
+    return keys;
+  }
+
+  async function decodeSFFv2(arrayBuffer, opts) {
     const dv = new DataView(arrayBuffer);
+    const u8 = new Uint8Array(arrayBuffer);
     const verLo3 = dv.getUint8(12);
     const verLo2 = dv.getUint8(13);
     const verLo1 = dv.getUint8(14);
@@ -453,9 +847,10 @@
     const ldataOffset = dv.getUint32(52, true);
     const tdataOffset = dv.getUint32(60, true);
 
-    // 1. Decode palettes (16 bytes per palette node)
-    const palNodes = [];
+    // 1. Parse palettes (16 bytes per palette node)
+    const palNodes = new Array(nbPalettes);
     const palettes = new Array(nbPalettes);
+    let palCount = 0;
     for (let p = 0; p < nbPalettes; p++) {
       const pNode = palOffset + p * 16;
       if (pNode + 16 > dv.byteLength) break;
@@ -463,7 +858,7 @@
       const linkIdx = dv.getUint16(pNode + 6, true);
       const dataOff = ldataOffset + dv.getUint32(pNode + 8, true);
       const dataLen = dv.getUint32(pNode + 12, true);
-      palNodes.push({ numCols, linkIdx, dataOff, dataLen });
+      palNodes[palCount++] = { numCols, linkIdx, dataOff, dataLen };
 
       if (dataLen === 0) {
         palettes[p] = null;
@@ -472,13 +867,8 @@
       const pal = new Array(256);
       for (let c = 0; c < 256; c++) {
         const cOff = dataOff + c * 4;
-        if (c < numCols && cOff + 3 < dv.byteLength) {
-          pal[c] = [
-            dv.getUint8(cOff),
-            dv.getUint8(cOff + 1),
-            dv.getUint8(cOff + 2),
-            255
-          ];
+        if (c < numCols && cOff + 3 < u8.length) {
+          pal[c] = [u8[cOff], u8[cOff + 1], u8[cOff + 2], 255];
         } else {
           pal[c] = [0, 0, 0, 255];
         }
@@ -486,10 +876,10 @@
       palettes[p] = pal;
     }
     // Resolve linked palettes (supports chained links)
-    for (let p = 0; p < palNodes.length; p++) {
+    for (let p = 0; p < palCount; p++) {
       if (palettes[p]) continue;
       let cur = palNodes[p].linkIdx;
-      for (let hops = 0; hops < 8 && cur < palNodes.length; hops++) {
+      for (let hops = 0; hops < 8 && cur < palCount; hops++) {
         if (palettes[cur]) {
           palettes[p] = palettes[cur];
           break;
@@ -499,10 +889,23 @@
       if (!palettes[p]) palettes[p] = palettes[0] || null;
     }
 
-    // 2. Parse & decode sprite nodes (28 bytes per sprite node)
+    // 2. Parse sprite node directory metadata upfront (<5ms, zero pixel decoding yet)
     const nodes = [];
     const spriteMap = new Map();
-    const pngTasks = [];
+    const sffObj = {
+      version: `${verHi}.${verLo1}.${verLo2}.${verLo3}`,
+      nbGroups: 0,
+      nbImages,
+      spriteCount: 0,
+      sprites: spriteMap,
+      nodes,
+      palettes,
+      _buffer: arrayBuffer,
+      _u8: u8,
+      _dv: dv
+    };
+
+    let hasPngSprites = false;
 
     for (let i = 0; i < nbImages; i++) {
       const sNode = spriteOffset + i * 28;
@@ -524,6 +927,17 @@
 
       const baseOff = (flags & 1) ? tdataOffset : ldataOffset;
       const absOff = baseOff + rawDataOff;
+      const pal = palettes[palIdx] || palettes[0] || null;
+
+      let valid = false;
+      if (dataLen > 0 && width > 0 && height > 0 && width <= 2048 && height <= 2048 && absOff + dataLen <= dv.byteLength) {
+        if (fmt === 0 || ((fmt === 2 || fmt === 3 || fmt === 4) && dataLen > 4)) {
+          valid = true;
+        } else if (fmt === 10 || fmt === 11 || fmt === 12) {
+          valid = true;
+          hasPngSprites = true;
+        }
+      }
 
       const entry = {
         index: i,
@@ -540,72 +954,25 @@
         absOff,
         palIdx,
         decoded: null,
+        _sffRef: sffObj,
+        _isV2: true,
+        _palette: pal,
+        _bounds: null,
+        _linkTarget: null,
+        _shareTargetDecoded: false,
+        _isLinkSource: false,
         _rawIndexed: null,
-        _rawPngBytes: null
+        _rawPngBytes: null,
+        _decodePromise: null,
+        _valid: valid
       };
       nodes.push(entry);
-
-      // Linked sprites have dataLen === 0 (often fmt === 1); resolve in pass 3 so chained & diff-palette links work
-      if (dataLen === 0) {
-        continue;
-      }
-
-      if (width <= 0 || height <= 0 || width > 2048 || height > 2048 || absOff + dataLen > dv.byteLength) {
-        continue;
-      }
-
-      const pal = palettes[palIdx] || palettes[0] || null;
-
-      if (fmt === 0) {
-        const rawBytes = new Uint8Array(arrayBuffer, absOff, Math.min(dataLen, width * height));
-        entry._rawIndexed = rawBytes;
-        entry.decoded = indexedToCanvas(rawBytes, width, height, pal);
+      if (valid) {
         spriteMap.set(`${groupNo},${imageNo}`, entry);
-      } else if (fmt === 2) {
-        // RLE8 (first 4 bytes are uncompressed length)
-        if (dataLen > 4) {
-          const compBytes = new Uint8Array(arrayBuffer, absOff + 4, dataLen - 4);
-          const pix = decodeRle8(compBytes, width * height);
-          entry._rawIndexed = pix;
-          entry.decoded = indexedToCanvas(pix, width, height, pal);
-          spriteMap.set(`${groupNo},${imageNo}`, entry);
-        }
-      } else if (fmt === 3) {
-        // RLE5 (first 4 bytes are uncompressed length)
-        if (dataLen > 4) {
-          const compBytes = new Uint8Array(arrayBuffer, absOff + 4, dataLen - 4);
-          const pix = decodeRle5(compBytes, width * height);
-          entry._rawIndexed = pix;
-          entry.decoded = indexedToCanvas(pix, width, height, pal);
-          spriteMap.set(`${groupNo},${imageNo}`, entry);
-        }
-      } else if (fmt === 4) {
-        // LZ5 (first 4 bytes are uncompressed length)
-        if (dataLen > 4) {
-          const compBytes = new Uint8Array(arrayBuffer, absOff + 4, dataLen - 4);
-          const pix = decodeLz5(compBytes, width * height);
-          entry._rawIndexed = pix;
-          entry.decoded = indexedToCanvas(pix, width, height, pal);
-          spriteMap.set(`${groupNo},${imageNo}`, entry);
-        }
-      } else if (fmt === 10 || fmt === 11 || fmt === 12) {
-        // Embedded PNG8 (10) / PNG24 (11) / PNG32 (12): skip 4-byte uncompressed size prefix before 0x89 PNG magic
-        let pngStart = absOff;
-        if (dataLen >= 12 && dv.getUint8(absOff) !== 0x89 && dv.getUint8(absOff + 4) === 0x89) {
-          pngStart = absOff + 4;
-        }
-        const pngRaw = new Uint8Array(arrayBuffer, pngStart, absOff + dataLen - pngStart);
-        if (fmt === 10) {
-          entry._rawPngBytes = pngRaw;
-          const patched = patchPng8PaletteAndAlpha(pngRaw, pal);
-          pngTasks.push({ entry, pngBytes: patched });
-        } else {
-          pngTasks.push({ entry, pngBytes: pngRaw });
-        }
       }
     }
 
-    // 3. Resolve linked sprites (supports chained links AND different palIdx!)
+    // 3. Resolve linked sprite metadata (chained links + diff-palette links)
     for (const entry of nodes) {
       if (entry.dataLen !== 0) continue;
       let target = null;
@@ -614,66 +981,57 @@
         const cand = nodes[curIdx];
         if (!cand || cand === entry) break;
         if (cand.dataLen > 0) {
-          target = cand;
+          target = cand._valid ? cand : null;
           break;
         }
         curIdx = cand.linkIdx;
       }
       if (!target) continue;
 
-      if (entry.palIdx !== target.palIdx) {
-        const pal = palettes[entry.palIdx] || palettes[0] || null;
-        if (target._rawIndexed) {
-          entry.decoded = indexedToCanvas(target._rawIndexed, target.width, target.height, pal);
-          spriteMap.set(`${entry.groupNo},${entry.imageNo}`, entry);
-        } else if (target._rawPngBytes && target.fmt === 10) {
-          const patched = patchPng8PaletteAndAlpha(target._rawPngBytes, pal);
-          pngTasks.push({ entry, pngBytes: patched });
-        } else {
-          entry._linkTarget = target;
+      entry._linkTarget = target;
+      entry.width = target.width;
+      entry.height = target.height;
+      entry.fmt = target.fmt;
+      entry._valid = true;
+      if (entry.palIdx === target.palIdx) {
+        entry._shareTargetDecoded = true;
+      } else {
+        entry._shareTargetDecoded = false;
+        target._isLinkSource = true;
+      }
+      spriteMap.set(`${entry.groupNo},${entry.imageNo}`, entry);
+    }
+
+    // 4. For PNG-based SFF v2 packs, eagerly decode only candidate action first-frames needed for mapping
+    if (hasPngSprites) {
+      const airMap = opts && opts.air;
+      let pngEntries;
+      if (airMap) {
+        const candKeys = collectCandidatePngKeys(airMap, spriteMap);
+        pngEntries = [];
+        for (const k of candKeys) {
+          const e = spriteMap.get(k);
+          if (e && e._valid && (e.fmt === 10 || e.fmt === 11 || e.fmt === 12)) {
+            pngEntries.push(e);
+          }
         }
       } else {
-        entry._linkTarget = target;
+        pngEntries = nodes.filter((e) => e._valid && (e.fmt === 10 || e.fmt === 11 || e.fmt === 12));
+      }
+
+      const BATCH_SIZE = 24;
+      for (let b = 0; b < pngEntries.length; b += BATCH_SIZE) {
+        const slice = pngEntries.slice(b, b + BATCH_SIZE);
+        await Promise.all(slice.map((e) => ensureSpriteDecodedAsync(e)));
       }
     }
 
-    // 4. Decode PNG tasks in bounded concurrent batches
-    const BATCH_SIZE = 64;
-    for (let b = 0; b < pngTasks.length; b += BATCH_SIZE) {
-      const slice = pngTasks.slice(b, b + BATCH_SIZE);
-      await Promise.all(
-        slice.map(async (task) => {
-          const decoded = await decodePngBytesToCanvas(task.pngBytes);
-          if (decoded) {
-            task.entry.decoded = decoded;
-            spriteMap.set(`${task.entry.groupNo},${task.entry.imageNo}`, task.entry);
-          }
-        })
-      );
-    }
-
-    // 5. Finalize shared linked sprite references & release temporary buffers
-    for (const entry of nodes) {
-      if (!entry.decoded && entry._linkTarget && entry._linkTarget.decoded) {
-        entry.decoded = entry._linkTarget.decoded;
-        spriteMap.set(`${entry.groupNo},${entry.imageNo}`, entry);
-      }
-      entry._rawIndexed = null;
-      entry._rawPngBytes = null;
-      entry._linkTarget = null;
-    }
-
-    return {
-      version: `${verHi}.${verLo1}.${verLo2}.${verLo3}`,
-      nbGroups: 0,
-      nbImages,
-      spriteCount: spriteMap.size,
-      sprites: spriteMap
-    };
+    sffObj.spriteCount = spriteMap.size;
+    return sffObj;
   }
 
   // Unified SFF v1 / v2 Dispatcher
-  async function decodeSFF(arrayBuffer, actBufferOptional) {
+  async function decodeSFF(arrayBuffer, actBufferOptional, opts) {
     const dv = new DataView(arrayBuffer);
     const signature = readAscii(dv, 0, 11);
     if (!signature.startsWith('ElecbyteSpr')) {
@@ -681,13 +1039,14 @@
     }
     const verHi = dv.getUint8(15);
     if (verHi >= 2) {
-      return await decodeSFFv2(arrayBuffer);
+      return await decodeSFFv2(arrayBuffer, opts);
     }
     return decodeSFFv1(arrayBuffer, actBufferOptional);
   }
 
   function decodeSFFv1(arrayBuffer, actBufferOptional) {
     const dv = new DataView(arrayBuffer);
+    const u8 = new Uint8Array(arrayBuffer);
     const verLo3 = dv.getUint8(12);
     const verLo2 = dv.getUint8(13);
     const verLo1 = dv.getUint8(14);
@@ -705,6 +1064,18 @@
 
     const subfiles = [];
     const spriteMap = new Map();
+    const sffObj = {
+      version: `${verHi}.${verLo1}.${verLo2}.${verLo3}`,
+      nbGroups,
+      nbImages,
+      spriteCount: 0,
+      sprites: spriteMap,
+      nodes: subfiles,
+      _buffer: arrayBuffer,
+      _u8: u8,
+      _dv: dv
+    };
+
     let offset = firstSubfileOffset;
 
     for (let i = 0; i < nbImages && offset > 0 && offset + 32 <= dv.byteLength; i++) {
@@ -723,60 +1094,6 @@
         : (nextOffset > dataStart ? Math.min(dv.byteLength, nextOffset) : dv.byteLength);
 
       const isBigPortrait = (groupNo === 9000 && imageNo === 1);
-      let decoded = null;
-
-      if (subLength === 0) {
-        // Resolve linked sprite (handle chained links cleanly)
-        let curLink = linkedIndex;
-        for (let hops = 0; hops < 8 && curLink < subfiles.length; hops++) {
-          const target = subfiles[curLink];
-          if (!target) break;
-          if (target.decoded) {
-            decoded = target.decoded;
-            break;
-          }
-          curLink = target.linkedIndex;
-        }
-      } else if (dataEnd > dataStart) {
-        const pcxBuf = arrayBuffer.slice(dataStart, dataEnd);
-
-        // Auto-verify .act byte order against first non-portrait sprite's embedded palette (if present)
-        if (actPalette && !actOrderChecked && !isBigPortrait) {
-          const embPal = extractPcxEmbeddedPalette(pcxBuf);
-          if (embPal) {
-            actOrderChecked = true;
-            const revScore = countPaletteMatches(actPalette, embPal);
-            const fwdScore = countPaletteMatches(actPaletteFwd, embPal);
-            if (fwdScore > revScore + 32) {
-              actPalette = actPaletteFwd;
-              firstPalette = actPalette;
-              prevPalette = actPalette;
-            }
-          }
-        }
-
-        // Canonical MUGEN SFF v1 palette rule:
-        // - samePalette=true inherits prevPalette (or firstPalette)
-        // - sprite 0 / sprite (0,0) with .act uses actPalette
-        // - samePalette=false FX/beams/portraits use their OWN embedded PCX palette!
-        let palToUse = null;
-        if (samePalette) {
-          palToUse = prevPalette || firstPalette;
-        } else if (actPalette && ((i === 0 && !isBigPortrait) || (groupNo === 0 && imageNo === 0))) {
-          palToUse = actPalette;
-        }
-
-        decoded = decodePcxToCanvas(pcxBuf, palToUse, prevPalette || firstPalette);
-
-        if (decoded && decoded.palette) {
-          if (!firstPalette && !isBigPortrait) {
-            firstPalette = decoded.palette;
-          }
-          if (!isBigPortrait) {
-            prevPalette = decoded.palette;
-          }
-        }
-      }
 
       const entry = {
         index: i,
@@ -784,25 +1101,117 @@
         imageNo,
         axisX,
         axisY,
+        width: 0,
+        height: 0,
         linkedIndex,
-        decoded
+        decoded: null,
+        _sffRef: sffObj,
+        _isV1: true,
+        _dataStart: dataStart,
+        _dataEnd: dataEnd,
+        _subLength: subLength,
+        _palette: null,
+        _hasEmbeddedPal: false,
+        _linkTarget: null,
+        _shareTargetDecoded: true,
+        _isLinkSource: false,
+        _rawIndexed: null,
+        _bounds: null,
+        _valid: false
       };
-      subfiles.push(entry);
-      if (decoded) {
-        spriteMap.set(`${groupNo},${imageNo}`, entry);
+
+      if (subLength === 0) {
+        // Resolve linked sprite metadata (chained links)
+        let curLink = linkedIndex;
+        let target = null;
+        for (let hops = 0; hops < 8 && curLink < subfiles.length; hops++) {
+          const cand = subfiles[curLink];
+          if (!cand) break;
+          if (cand._subLength > 0 && cand._valid) {
+            target = cand;
+            break;
+          }
+          if (cand._linkTarget && cand._linkTarget._valid) {
+            target = cand._linkTarget;
+            break;
+          }
+          curLink = cand.linkedIndex;
+        }
+        if (target) {
+          entry._linkTarget = target;
+          entry.width = target.width;
+          entry.height = target.height;
+          entry._valid = true;
+          spriteMap.set(`${groupNo},${imageNo}`, entry);
+        }
+      } else if (dataEnd >= dataStart + 128) {
+        // Parse PCX 128-byte header & trailing palette without RLE-decoding pixels upfront
+        if (u8[dataStart] === 0x0a && u8[dataStart + 3] === 8) {
+          const xmin = u8[dataStart + 4] | (u8[dataStart + 5] << 8);
+          const ymin = u8[dataStart + 6] | (u8[dataStart + 7] << 8);
+          const xmax = u8[dataStart + 8] | (u8[dataStart + 9] << 8);
+          const ymax = u8[dataStart + 10] | (u8[dataStart + 11] << 8);
+          const width = xmax - xmin + 1;
+          const height = ymax - ymin + 1;
+
+          if (width > 0 && height > 0 && width <= 2048 && height <= 2048) {
+            const pcxBytes = u8.subarray(dataStart, dataEnd);
+            let embPal = undefined;
+
+            if (actPalette && !actOrderChecked && !isBigPortrait) {
+              embPal = extractPcxEmbeddedPaletteBytes(pcxBytes);
+              if (embPal) {
+                actOrderChecked = true;
+                const revScore = countPaletteMatches(actPalette, embPal);
+                const fwdScore = countPaletteMatches(actPaletteFwd, embPal);
+                if (fwdScore > revScore + 32) {
+                  actPalette = actPaletteFwd;
+                  firstPalette = actPalette;
+                  prevPalette = actPalette;
+                }
+              }
+            }
+
+            let palToUse = null;
+            if (samePalette) {
+              palToUse = prevPalette || firstPalette;
+            } else if (actPalette && ((i === 0 && !isBigPortrait) || (groupNo === 0 && imageNo === 0))) {
+              palToUse = actPalette;
+            }
+
+            let hasEmbeddedPal = false;
+            if (!palToUse) {
+              if (embPal === undefined) {
+                embPal = extractPcxEmbeddedPaletteBytes(pcxBytes);
+              }
+              hasEmbeddedPal = Boolean(embPal);
+            }
+
+            const resolvedPal = palToUse || embPal || prevPalette || firstPalette || DEFAULT_WHITE_PALETTE;
+            if (!firstPalette && !isBigPortrait) {
+              firstPalette = resolvedPal;
+            }
+            if (!isBigPortrait) {
+              prevPalette = resolvedPal;
+            }
+
+            entry.width = width;
+            entry.height = height;
+            entry._palette = resolvedPal;
+            entry._hasEmbeddedPal = hasEmbeddedPal;
+            entry._valid = true;
+            spriteMap.set(`${groupNo},${imageNo}`, entry);
+          }
+        }
       }
 
+      subfiles.push(entry);
       if (nextOffset <= offset || nextOffset >= dv.byteLength) break;
       offset = nextOffset;
     }
 
-    return {
-      version: `${verHi}.${verLo1}.${verLo2}.${verLo3}`,
-      nbGroups,
-      nbImages,
-      spriteCount: spriteMap.size,
-      sprites: spriteMap
-    };
+    sffObj.spriteCount = spriteMap.size;
+    return sffObj;
   }
 
   // ==================== AIR & DEF DECODERS ====================
@@ -935,6 +1344,9 @@
   }
 
   // ==================== SPRITE BOUNDS, AUTO-SCALING & SMART ACTION MAPPING ====================
+  let _boundsScratchCanvas = null;
+  let _boundsScratchCtx = null;
+
   function getSpriteBounds(decoded) {
     if (!decoded || !decoded.canvas) return null;
     if (decoded._bounds) return decoded._bounds;
@@ -943,7 +1355,22 @@
     const h = decoded.height || decoded.canvas.height;
     if (w <= 0 || h <= 0) return null;
 
-    const ctx = decoded.canvas.getContext('2d');
+    let ctx;
+    if (typeof decoded.canvas.getContext === 'function') {
+      ctx = decoded.canvas.getContext('2d');
+    } else {
+      // ImageBitmap fallback: use a single reusable scratch canvas
+      if (!_boundsScratchCanvas) {
+        _boundsScratchCanvas = document.createElement('canvas');
+        _boundsScratchCtx = _boundsScratchCanvas.getContext('2d', { willReadFrequently: true });
+      }
+      if (_boundsScratchCanvas.width < w) _boundsScratchCanvas.width = w;
+      if (_boundsScratchCanvas.height < h) _boundsScratchCanvas.height = h;
+      _boundsScratchCtx.clearRect(0, 0, w, h);
+      _boundsScratchCtx.drawImage(decoded.canvas, 0, 0);
+      ctx = _boundsScratchCtx;
+    }
+
     const data = ctx.getImageData(0, 0, w, h).data;
     let minX = w;
     let maxX = -1;
@@ -1000,7 +1427,7 @@
     return false;
   }
 
-  function findFirstVisibleElement(action, sffSprites, allowPortrait, skipAdditive) {
+  function findFirstVisibleElement(action, sffSprites, allowPortrait, skipAdditive, requireDecoded) {
     if (!action || !action.elements || action.elements.length === 0) return null;
     // Pass 1: Prefer non-additive body sprites so additive FX (", A") never hijack stance detection
     for (const el of action.elements) {
@@ -1008,8 +1435,12 @@
       if (!allowPortrait && el.groupNo >= 9000) continue;
       if (isElementAdditive(el)) continue;
       const spr = sffSprites.get(`${el.groupNo},${el.imageNo}`);
-      if (!spr || !spr.decoded || !spr.decoded.canvas) continue;
-      const b = getSpriteBounds(spr.decoded);
+      if (!spr) continue;
+      if (requireDecoded) {
+        const dec = ensureSpriteDecoded(spr);
+        if (!dec || !dec.canvas) continue;
+      }
+      const b = ensureSpriteBounds(spr);
       if (b && b.opaqueCount > 16) {
         return { elem: el, spr, bounds: b, isAdditive: false };
       }
@@ -1020,8 +1451,12 @@
       if (el.groupNo < 0 || el.imageNo < 0) continue;
       if (!allowPortrait && el.groupNo >= 9000) continue;
       const spr = sffSprites.get(`${el.groupNo},${el.imageNo}`);
-      if (!spr || !spr.decoded || !spr.decoded.canvas) continue;
-      const b = getSpriteBounds(spr.decoded);
+      if (!spr) continue;
+      if (requireDecoded) {
+        const dec = ensureSpriteDecoded(spr);
+        if (!dec || !dec.canvas) continue;
+      }
+      const b = ensureSpriteBounds(spr);
       if (b && b.opaqueCount > 16) {
         return { elem: el, spr, bounds: b, isAdditive: isElementAdditive(el) };
       }
@@ -1269,13 +1704,13 @@
   function computeFighterMetrics(sff, air, mapping, scaleMult) {
     const mult = (typeof scaleMult === 'number' && scaleMult > 0) ? scaleMult : 1.0;
     const idleAction = air.get(mapping.idle);
-    let vis = findFirstVisibleElement(idleAction, sff.sprites, false, true)
-      || findFirstVisibleElement(idleAction, sff.sprites, false, false);
+    let vis = findFirstVisibleElement(idleAction, sff.sprites, false, true, false)
+      || findFirstVisibleElement(idleAction, sff.sprites, false, false, false);
     if (!vis) {
       // Fallback: find any visible non-portrait sprite in SFF
       for (const spr of sff.sprites.values()) {
-        if (spr.groupNo >= 9000 || !spr.decoded || !spr.decoded.canvas) continue;
-        const b = getSpriteBounds(spr.decoded);
+        if (spr.groupNo >= 9000) continue;
+        const b = ensureSpriteBounds(spr);
         if (b && b.opaqueCount > 50 && b.visH >= 16) {
           vis = { elem: { x: 0, y: 0, flip: '' }, spr, bounds: b };
           break;
@@ -1362,6 +1797,181 @@
 
     pack.altMetrics.set(cacheKey, view);
     return view;
+  }
+
+  function collectMappingInitialEntries(pack, mapping, extraOffsets) {
+    const out = [];
+    const seen = new Set();
+    const pushEntry = (spr) => {
+      if (!spr || seen.has(spr)) return;
+      seen.add(spr);
+      out.push(spr);
+    };
+    const pushAction = (actionId, allFrames) => {
+      if (typeof actionId !== 'number') return;
+      const act = pack.air.get(actionId);
+      if (!act || !act.elements) return;
+      for (let i = 0; i < act.elements.length; i++) {
+        const el = act.elements[i];
+        if (!el || el.groupNo < 0 || el.imageNo < 0 || el.groupNo >= 9000) continue;
+        const spr = pack.sff.sprites.get(`${el.groupNo},${el.imageNo}`);
+        if (!spr) continue;
+        pushEntry(spr);
+        if (!allFrames) break;
+      }
+    };
+
+    if (mapping) {
+      pushAction(mapping.idle, true);
+      pushAction(mapping.walk, false);
+      pushAction(mapping.jump, false);
+      pushAction(mapping.dash, false);
+      pushAction(mapping.guard, false);
+      pushAction(mapping.hurt, false);
+      pushAction(mapping.hurtFly, false);
+      pushAction(mapping.dead, false);
+      if (mapping.skills) {
+        for (const k of Object.keys(mapping.skills)) {
+          pushAction(mapping.skills[k], false);
+        }
+      }
+    }
+
+    if (Array.isArray(extraOffsets)) {
+      for (const off of extraOffsets) {
+        if (off > 0) pushAction(off, false);
+      }
+    }
+
+    // Keep portrait sprites warm for extract-avatars.js compatibility
+    pushEntry(pack.sff.sprites.get('9000,0'));
+    pushEntry(pack.sff.sprites.get('9000,1'));
+    pushEntry(pack.sff.sprites.get('9000,9'));
+    return out;
+  }
+
+  async function warmPackInitialSprites(pack, preset) {
+    if (!pack || !pack.sff || !pack.sff.sprites) return;
+    const extraOffsets = [];
+    if (preset && preset.awakenedActionOffset) extraOffsets.push(preset.awakenedActionOffset);
+    const entries = collectMappingInitialEntries(pack, pack.mapping, extraOffsets);
+    const asyncTasks = [];
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      if (e.decoded && e.decoded.canvas) continue;
+      const target = e._linkTarget || e;
+      if (target._isV2 && (target.fmt === 10 || target.fmt === 11 || target.fmt === 12)) {
+        asyncTasks.push(ensureSpriteDecodedAsync(e));
+      } else {
+        ensureSpriteDecoded(e);
+      }
+    }
+    if (asyncTasks.length > 0) {
+      await Promise.all(asyncTasks);
+    }
+  }
+
+  function scheduleBackgroundPredecode(pack) {
+    if (!pack || !pack.sff || !pack.sff.sprites || pack._bgPredecodeStarted) return;
+    pack._bgPredecodeStarted = true;
+
+    const queue = [];
+    const seen = new Set();
+    const enqueueAction = (act) => {
+      if (!act || !act.elements) return;
+      for (let i = 0; i < act.elements.length; i++) {
+        const el = act.elements[i];
+        if (!el || el.groupNo < 0 || el.imageNo < 0 || el.groupNo >= 9000) continue;
+        const spr = pack.sff.sprites.get(`${el.groupNo},${el.imageNo}`);
+        if (!spr || (spr.decoded && spr.decoded.canvas) || seen.has(spr)) continue;
+        seen.add(spr);
+        queue.push(spr);
+      }
+    };
+
+    // Prioritize mapped combat actions first, then remaining AIR actions
+    if (pack.mapping) {
+      const m = pack.mapping;
+      const priorityIds = [m.walk, m.jump, m.dash, m.guard, m.hurt, m.hurtFly, m.dead];
+      if (m.skills) {
+        for (const k of Object.keys(m.skills)) priorityIds.push(m.skills[k]);
+      }
+      for (const id of priorityIds) enqueueAction(pack.air.get(id));
+    }
+    pack.air.forEach((act) => enqueueAction(act));
+
+    if (queue.length === 0) return;
+
+    let cursor = 0;
+    const scheduleSlice = (fn) => {
+      if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(fn, { timeout: 120 });
+      } else {
+        setTimeout(fn, 24);
+      }
+    };
+
+    const runSlice = (deadline) => {
+      if (pack._evicted || cursor >= queue.length) return;
+      const start = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      let decodedInSlice = 0;
+      const asyncBatch = [];
+
+      while (cursor < queue.length && decodedInSlice < 8) {
+        if (deadline && typeof deadline.timeRemaining === 'function' && deadline.timeRemaining() < 2 && decodedInSlice > 0) {
+          break;
+        }
+        const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+        if (now - start > 5 && decodedInSlice > 0) break;
+
+        const spr = queue[cursor++];
+        if (!spr || (spr.decoded && spr.decoded.canvas)) continue;
+        const target = spr._linkTarget || spr;
+        if (target._isV2 && (target.fmt === 10 || target.fmt === 11 || target.fmt === 12)) {
+          asyncBatch.push(ensureSpriteDecodedAsync(spr));
+          decodedInSlice += 2;
+        } else {
+          ensureSpriteDecoded(spr);
+          decodedInSlice++;
+        }
+      }
+
+      if (cursor < queue.length && !pack._evicted) {
+        if (asyncBatch.length > 0) {
+          Promise.all(asyncBatch).then(() => {
+            if (!pack._evicted) scheduleSlice(runSlice);
+          }).catch(() => {});
+        } else {
+          scheduleSlice(runSlice);
+        }
+      }
+    };
+
+    scheduleSlice(runSlice);
+  }
+
+  function releasePackResources(pack) {
+    if (!pack) return;
+    pack._evicted = true;
+    if (pack.sff) {
+      if (pack.sff.sprites) {
+        for (const spr of pack.sff.sprites.values()) {
+          if (spr && spr.decoded && spr.decoded._isBitmap && spr.decoded.canvas && typeof spr.decoded.canvas.close === 'function') {
+            try {
+              spr.decoded.canvas.close();
+            } catch (_) {}
+          }
+          if (spr) {
+            spr.decoded = null;
+            spr._rawIndexed = null;
+            spr._rawPngBytes = null;
+          }
+        }
+      }
+      pack.sff._buffer = null;
+      pack.sff._u8 = null;
+      pack.sff._dv = null;
+    }
   }
 
   class MugenCharacterRegistry {
@@ -1487,8 +2097,13 @@
         }
       }
       this.loadingSet = new Set();
-      this.maxCachedPacks = 6;
+      this.loadingPromises = new Map();
+      this.maxCachedPacks = 12;
       this._lruSeq = 0;
+    }
+
+    ensureSpriteDecoded(entry) {
+      return ensureSpriteDecoded(entry);
     }
 
     getPreset(fighterId) {
@@ -1547,7 +2162,9 @@
           }
         }
         if (!victimId) break;
+        const victimPack = this.loadedPacks.get(victimId);
         this.loadedPacks.delete(victimId);
+        releasePackResources(victimPack);
       }
     }
 
@@ -1568,12 +2185,9 @@
     }
 
     async ensureFightersLoaded(p1Id, p2Id) {
-      const targets = [p1Id, p2Id].filter((id) => id && this.getPreset(id) && !this.loadedPacks.has(id) && !this.loadingSet.has(id));
+      const targets = [p1Id, p2Id].filter((id) => id && this.getPreset(id) && !this.loadedPacks.has(id) && !this.loadingPromises.has(id));
       for (const id of targets) {
-        this.loadingSet.add(id);
-        this.loadPresetForFighter(id).finally(() => {
-          this.loadingSet.delete(id);
-        });
+        this.loadPresetForFighter(id).catch(() => null);
       }
     }
 
@@ -1587,62 +2201,78 @@
         this.touchPack(existing);
         return existing;
       }
+      if (this.loadingPromises.has(fighterId)) {
+        return this.loadingPromises.get(fighterId);
+      }
       const preset = this.getPreset(fighterId);
       if (!preset) return null;
 
-      try {
-        const hasRemoteBase = Boolean(getAssetBaseUrl());
-        const fetchAsset = (relUrl) => {
-          const url = resolveAssetUrl(relUrl);
-          return hasRemoteBase ? fetch(url, { mode: 'cors' }) : fetch(url);
-        };
-        const [sffResp, airResp, actResp] = await Promise.all([
-          fetchAsset(preset.sffUrl),
-          fetchAsset(preset.airUrl),
-          preset.actUrl ? fetchAsset(preset.actUrl) : Promise.resolve(null)
-        ]);
-        if (!sffResp.ok || !airResp.ok) {
-          this.failedIds.add(fighterId);
+      const loadTask = (async () => {
+        this.loadingSet.add(fighterId);
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const fetchTimeoutMs = 15000;
+        const timer = controller ? setTimeout(() => controller.abort(), fetchTimeoutMs) : null;
+        try {
+          const hasRemoteBase = Boolean(getAssetBaseUrl());
+          const sig = controller ? controller.signal : null;
+          const [sffBuf, airText, actBuf] = await Promise.all([
+            fetchAssetWithCache(preset.sffUrl, false, sig, hasRemoteBase),
+            fetchAssetWithCache(preset.airUrl, true, sig, hasRemoteBase),
+            preset.actUrl ? fetchAssetWithCache(preset.actUrl, false, sig, hasRemoteBase) : Promise.resolve(null)
+          ]);
+          if (!sffBuf || !airText) {
+            this.failedIds.add(fighterId);
+            return null;
+          }
+
+          const air = decodeAIR(airText);
+          const sff = await decodeSFF(sffBuf, actBuf, { air });
+          const baseActionOffset = preset.baseActionOffset || 0;
+          const baseScaleMult = preset.baseScaleMult || 1.0;
+          const mapping = buildBvnActionMapping(air, sff.sprites, baseActionOffset);
+          const metrics = computeFighterMetrics(sff, air, mapping, baseScaleMult);
+
+          const pack = {
+            fighterId,
+            sff,
+            air,
+            mapping,
+            scale: metrics.scale,
+            footOffsetY: metrics.footOffsetY,
+            idleHeightPx: metrics.idleHeightPx,
+            idleBounds: metrics.idleBounds,
+            baseActionOffset,
+            baseScaleMult,
+            altMappings: new Map(),
+            altMetrics: new Map(),
+            _lastUsed: 0,
+            _lastUsedAt: 0,
+            _evicted: false,
+            _bgPredecodeStarted: false
+          };
+          await warmPackInitialSprites(pack, preset);
+          this.failedIds.delete(fighterId);
+          this.touchPack(pack);
+          this.loadedPacks.set(fighterId, pack);
+          this.evictLruPacks(fighterId);
+          scheduleBackgroundPredecode(pack);
+          this.notifyStatus(`Đã nạp M.U.G.E.N SFF v${sff.version} cho [${fighterId.toUpperCase()}]: ${sff.spriteCount} sprites, ${air.size} actions (scale ${metrics.scale.toFixed(2)}x)`);
+          return pack;
+        } catch (err) {
+          if (err && err.name !== 'AbortError') {
+            this.failedIds.add(fighterId);
+          }
+          console.warn('[MUGEN Loader] Skip preset load for', fighterId, err && err.message ? err.message : err);
           return null;
+        } finally {
+          if (timer) clearTimeout(timer);
+          this.loadingSet.delete(fighterId);
+          this.loadingPromises.delete(fighterId);
         }
+      })();
 
-        const sffBuf = await sffResp.arrayBuffer();
-        const airText = await airResp.text();
-        const actBuf = (actResp && actResp.ok) ? await actResp.arrayBuffer() : null;
-
-        const sff = await decodeSFF(sffBuf, actBuf);
-        const air = decodeAIR(airText);
-        const baseActionOffset = preset.baseActionOffset || 0;
-        const baseScaleMult = preset.baseScaleMult || 1.0;
-        const mapping = buildBvnActionMapping(air, sff.sprites, baseActionOffset);
-        const metrics = computeFighterMetrics(sff, air, mapping, baseScaleMult);
-
-        const pack = {
-          fighterId,
-          sff,
-          air,
-          mapping,
-          scale: metrics.scale,
-          footOffsetY: metrics.footOffsetY,
-          idleHeightPx: metrics.idleHeightPx,
-          idleBounds: metrics.idleBounds,
-          baseActionOffset,
-          baseScaleMult,
-          altMappings: new Map(),
-          altMetrics: new Map(),
-          _lastUsed: 0,
-          _lastUsedAt: 0
-        };
-        this.touchPack(pack);
-        this.loadedPacks.set(fighterId, pack);
-        this.evictLruPacks(fighterId);
-        this.notifyStatus(`Đã nạp M.U.G.E.N SFF v${sff.version} cho [${fighterId.toUpperCase()}]: ${sff.spriteCount} sprites, ${air.size} actions (scale ${metrics.scale.toFixed(2)}x)`);
-        return pack;
-      } catch (err) {
-        this.failedIds.add(fighterId);
-        console.warn('[MUGEN Loader] Skip preset load for', fighterId, err.message);
-        return null;
-      }
+      this.loadingPromises.set(fighterId, loadTask);
+      return loadTask;
     }
 
     async loadAllBuiltInPresets() {
@@ -1680,8 +2310,8 @@
       const charName = defInfo.displayname || defInfo.name || sffFile.name.replace(/\.sff$/i, '');
       const customId = 'mugen_' + charName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
 
-      const sff = await decodeSFF(sffBuf, actBuf);
       const air = decodeAIR(airText);
+      const sff = await decodeSFF(sffBuf, actBuf, { air });
       const mapping = buildBvnActionMapping(air, sff.sprites);
       const metrics = computeFighterMetrics(sff, air, mapping);
 
@@ -1712,11 +2342,15 @@
         altMappings: new Map(),
         altMetrics: new Map(),
         _lastUsed: 0,
-        _lastUsedAt: 0
+        _lastUsedAt: 0,
+        _evicted: false,
+        _bgPredecodeStarted: false
       };
+      await warmPackInitialSprites(pack, null);
       this.touchPack(pack);
       this.loadedPacks.set(customId, pack);
       this.evictLruPacks(customId);
+      scheduleBackgroundPredecode(pack);
 
       if (window.gameApp) {
         if (targetSlot === 2) {
@@ -1749,10 +2383,13 @@
       // Try current element first (skip -1,* blank spacers and 90xx portraits/screen-fade helpers)
       if (curEl && curEl.groupNo >= 0 && curEl.imageNo >= 0 && curEl.groupNo < 9000) {
         const spr = pack.sff.sprites.get(`${curEl.groupNo},${curEl.imageNo}`);
-        if (spr && spr.decoded && spr.decoded.canvas) {
-          fighter._mugenLastValidElem = curEl;
-          fighter._mugenLastValidSpr = spr;
-          return { elem: curEl, spr };
+        if (spr) {
+          const dec = ensureSpriteDecoded(spr);
+          if (dec && dec.canvas) {
+            fighter._mugenLastValidElem = curEl;
+            fighter._mugenLastValidSpr = spr;
+            return { elem: curEl, spr };
+          }
         }
       }
 
@@ -1762,7 +2399,7 @@
       }
 
       // Otherwise find first valid visible sprite in the same action
-      const inAct = findFirstVisibleElement(action, pack.sff.sprites, false, false);
+      const inAct = findFirstVisibleElement(action, pack.sff.sprites, false, false, true);
       if (inAct) {
         fighter._mugenLastValidElem = inAct.elem;
         fighter._mugenLastValidSpr = inAct.spr;
@@ -1772,7 +2409,7 @@
       // Finally fall back to active form's idle action first visible sprite (NEVER flash 9000,0 portrait!)
       const mapping = activeMapping || pack.mapping;
       const idleAct = pack.air.get(mapping.idle);
-      const inIdle = findFirstVisibleElement(idleAct, pack.sff.sprites, false, false);
+      const inIdle = findFirstVisibleElement(idleAct, pack.sff.sprites, false, false, true);
       if (inIdle) {
         fighter._mugenLastValidElem = inIdle.elem;
         fighter._mugenLastValidSpr = inIdle.spr;

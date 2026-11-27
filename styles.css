@@ -2746,7 +2746,12 @@ body:has(#screenBattle.active) #screenBattle {
   letter-spacing: 0.06em;
 }
 .vs-load-status {
-  margin-top: 8px;
+  display: inline-block;
+  margin-top: 10px;
+  padding: 4px 14px;
+  background: rgba(9, 10, 15, 0.92);
+  border: 1px solid rgba(0, 210, 255, 0.35);
+  border-radius: 999px;
   font-size: 0.74rem;
   color: var(--p1-color);
   font-weight: 600;

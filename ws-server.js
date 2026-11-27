@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const crypto = require('crypto');
+const zlib = require('zlib');
 
 const PORT = Number(process.env.PORT || 8080);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -52,8 +53,150 @@ const MIME_TYPES = {
   '.woff2': 'font/woff2',
   '.mp3': 'audio/mpeg',
   '.ogg': 'audio/ogg',
-  '.wav': 'audio/wav'
+  '.wav': 'audio/wav',
+  '.air': 'text/plain; charset=utf-8',
+  '.def': 'text/plain; charset=utf-8',
+  '.cns': 'text/plain; charset=utf-8',
+  '.cmd': 'text/plain; charset=utf-8',
+  '.act': 'application/octet-stream',
+  '.sff': 'application/octet-stream'
 };
+
+const COMPRESSIBLE_EXTS = new Set([
+  '.html', '.css', '.js', '.mjs', '.json', '.air', '.def', '.cns', '.cmd', '.svg'
+]);
+const HAS_BROTLI = typeof zlib.createBrotliCompress === 'function';
+
+function negotiateEncoding(acceptEncodingHeader) {
+  if (!acceptEncodingHeader || typeof acceptEncodingHeader !== 'string') return null;
+  let brQ = -1;
+  let gzipQ = -1;
+  for (const part of acceptEncodingHeader.split(',')) {
+    const [rawName, ...params] = part.trim().toLowerCase().split(';');
+    if (!rawName) continue;
+    let q = 1;
+    for (const p of params) {
+      const m = p.trim().match(/^q=([0-9.]+)$/);
+      if (m) {
+        const parsed = Number(m[1]);
+        if (!Number.isNaN(parsed)) q = parsed;
+      }
+    }
+    if (rawName === 'br') brQ = q;
+    else if (rawName === 'gzip') gzipQ = q;
+  }
+  if (HAS_BROTLI && brQ > 0 && brQ >= gzipQ) return 'br';
+  if (gzipQ > 0) return 'gzip';
+  if (HAS_BROTLI && brQ > 0) return 'br';
+  return null;
+}
+
+function getStaticCacheControl(relPath, ext) {
+  if (relPath === '/index.html' || ext === '.html') {
+    return 'public, max-age=0, must-revalidate';
+  }
+  if (relPath === '/config.js') {
+    return 'public, max-age=60';
+  }
+  if (relPath.startsWith('/avatars/') || relPath.startsWith('/chars/')) {
+    return 'public, max-age=3600';
+  }
+  return 'public, max-age=3600, stale-while-revalidate=86400';
+}
+
+function isNotModified(req, etag, mtime) {
+  const inm = req.headers['if-none-match'];
+  if (inm) {
+    if (inm.trim() === '*') return true;
+    const normEtag = etag.replace(/^W\//, '');
+    const tags = inm.split(',').map((t) => t.trim().replace(/^W\//, ''));
+    return tags.includes(normEtag);
+  }
+  const ims = req.headers['if-modified-since'];
+  if (ims) {
+    const imsMs = Date.parse(ims);
+    if (!Number.isNaN(imsMs) && Math.floor(mtime.getTime() / 1000) * 1000 <= imsMs) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function parseByteRange(rangeHeader, totalSize) {
+  if (!rangeHeader || typeof rangeHeader !== 'string') return null;
+  const m = rangeHeader.trim().match(/^bytes=(\d*)-(\d*)$/i);
+  if (!m) return { invalid: true };
+  const startStr = m[1];
+  const endStr = m[2];
+  if (startStr === '' && endStr === '') return { invalid: true };
+
+  let start;
+  let end;
+  if (startStr === '') {
+    const suffixLen = Number(endStr);
+    if (!Number.isFinite(suffixLen) || suffixLen <= 0 || totalSize === 0) return { invalid: true };
+    start = Math.max(0, totalSize - suffixLen);
+    end = totalSize - 1;
+  } else {
+    start = Number(startStr);
+    end = endStr === '' ? totalSize - 1 : Math.min(totalSize - 1, Number(endStr));
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || start >= totalSize || start > end) {
+      return { invalid: true };
+    }
+  }
+  return { start, end };
+}
+
+function streamStaticFile(filePath, res, statusCode, headers, readOpts, encoding) {
+  const fileStream = fs.createReadStream(filePath, readOpts);
+  let headersSent = false;
+  let compressor = null;
+
+  const cleanup = () => {
+    if (!fileStream.destroyed) fileStream.destroy();
+    if (compressor && !compressor.destroyed) compressor.destroy();
+  };
+
+  res.on('close', () => {
+    if (!res.writableFinished) cleanup();
+  });
+
+  fileStream.on('error', () => {
+    cleanup();
+    if (!headersSent && !res.headersSent) {
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('404 Not Found');
+    } else if (!res.destroyed) {
+      res.destroy();
+    }
+  });
+
+  fileStream.on('open', () => {
+    if (res.destroyed) {
+      cleanup();
+      return;
+    }
+    headersSent = true;
+    res.writeHead(statusCode, headers);
+    if (encoding === 'br') {
+      compressor = zlib.createBrotliCompress({
+        params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 }
+      });
+    } else if (encoding === 'gzip') {
+      compressor = zlib.createGzip({ level: 6 });
+    }
+
+    if (compressor) {
+      compressor.on('error', () => {
+        cleanup();
+        if (!res.destroyed) res.destroy();
+      });
+      fileStream.pipe(compressor).pipe(res);
+    } else {
+      fileStream.pipe(res);
+    }
+  });
+}
 
 // ==================== HELPERS: SANITIZATION, SECURITY & RATE LIMITS ====================
 
@@ -1477,30 +1620,73 @@ const server = http.createServer((req, res) => {
     }
 
     const ext = path.extname(filePath).toLowerCase();
+    const isCompressible = COMPRESSIBLE_EXTS.has(ext);
+    const hasRange = Boolean(req.headers.range);
+    const encoding = (!hasRange && isCompressible && stat.size >= 256)
+      ? negotiateEncoding(req.headers['accept-encoding'])
+      : null;
+    const etag = `"${stat.size.toString(16)}-${Math.floor(stat.mtimeMs).toString(16)}-${encoding || 'raw'}"`;
+
     const headers = {
       'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
-      'X-Content-Type-Options': 'nosniff'
+      'X-Content-Type-Options': 'nosniff',
+      'Cache-Control': getStaticCacheControl(relPath, ext),
+      'ETag': etag,
+      'Last-Modified': stat.mtime.toUTCString()
     };
-    if (relPath.startsWith('/avatars/') || relPath.startsWith('/chars/')) {
-      headers['Cache-Control'] = 'public, max-age=3600';
+    if (isCompressible) {
+      headers['Vary'] = 'Accept-Encoding';
+    }
+
+    if (!hasRange && isNotModified(req, etag, stat.mtime)) {
+      if (encoding) headers['Content-Encoding'] = encoding;
+      res.writeHead(304, headers);
+      res.end();
+      return;
+    }
+
+    if (hasRange) {
+      const range = parseByteRange(req.headers.range, stat.size);
+      if (!range || range.invalid) {
+        res.writeHead(416, {
+          'Content-Range': `bytes */${stat.size}`,
+          'Accept-Ranges': 'bytes'
+        });
+        res.end();
+        return;
+      }
+      headers['Accept-Ranges'] = 'bytes';
+      headers['Content-Range'] = `bytes ${range.start}-${range.end}/${stat.size}`;
+      headers['Content-Length'] = range.end - range.start + 1;
+      if (req.method === 'HEAD') {
+        res.writeHead(206, headers);
+        res.end();
+        return;
+      }
+      streamStaticFile(filePath, res, 206, headers, { start: range.start, end: range.end }, null);
+      return;
     }
 
     if (req.method === 'HEAD') {
-      headers['Content-Length'] = stat.size;
+      if (encoding) {
+        headers['Content-Encoding'] = encoding;
+      } else {
+        headers['Content-Length'] = stat.size;
+        headers['Accept-Ranges'] = 'bytes';
+      }
       res.writeHead(200, headers);
       res.end();
       return;
     }
 
-    fs.readFile(filePath, (readErr, content) => {
-      if (readErr) {
-        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('404 Not Found');
-        return;
-      }
-      res.writeHead(200, headers);
-      res.end(content);
-    });
+    if (encoding) {
+      headers['Content-Encoding'] = encoding;
+      streamStaticFile(filePath, res, 200, headers, {}, encoding);
+    } else {
+      headers['Content-Length'] = stat.size;
+      headers['Accept-Ranges'] = 'bytes';
+      streamStaticFile(filePath, res, 200, headers, {}, null);
+    }
   });
 });
 
